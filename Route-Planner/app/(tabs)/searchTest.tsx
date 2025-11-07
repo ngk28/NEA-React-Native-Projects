@@ -4,9 +4,18 @@ import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as React from 'react';
+import SQLite from 'react-native-sqlite-storage';
+import { Database } from '@/components/database';
 
 export default function TabTwoScreen() {
-  const [search, setSearch] = React.useState('');
+  const [search] = React.useState('');
+
+  const DatabaseContext = React.createContext<Database | null>(null);
+
+  React.useEffect(function () {
+
+  }, []);
+
 
   return (
     <ParallaxScrollView
@@ -21,8 +30,10 @@ export default function TabTwoScreen() {
       }>
       <ThemedText> Trial  </ThemedText>
       <TextInput
+        onPress={() => { }}
         placeholder="Search..."
-        onChangeText={setSearch}
+        placeholderTextColor="#888888"
+        onChangeText={() => { }}
         value={search}
       />
 
