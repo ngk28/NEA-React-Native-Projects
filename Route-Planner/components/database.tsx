@@ -5,15 +5,20 @@ let databaseInstance: SQLite.SQLiteDatabase | undefined;
 
 export interface Database {
     open(): Promise<SQLite.SQLiteDatabase>;
-    retrieveStations(): Promise<void>;
+    retrieveStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number; Time: number }>>;
+    countStations(): number;
 };
 
 export const Database: Database = {
     open,
-    retrieveStations,
+    retrieveStations: retrieveNeighbourStations,
+    countStations: countNumberOfStations,
 }
 
 async function open(): Promise<SQLite.SQLiteDatabase> {
+    if (databaseInstance) {
+        return databaseInstance;
+    }
     SQLite.enablePromise(true);
     const db = await SQLite.openDatabase(
         { name: 'LondonUndergroundTestV3.db', createFromLocation: 1, readOnly: true },
@@ -24,8 +29,21 @@ async function open(): Promise<SQLite.SQLiteDatabase> {
     databaseInstance = db;
     return db;
 }
-
-async function retrieveStations(stationId?: number): Promise<void> {
+function countNumberOfStations(): number {
+    const command = `SELECT COUNT(*) as count FROM stations`;
+    var count = -1;
+    databaseInstance?.transaction(tx => {
+        tx.executeSql(command, [], (tx, results) => {
+            var count = results.rows.item(0).count;
+            console.log('Number of stations:', count);
+        }, (tx, error) => {
+            console.error('Error counting stations: ', error);
+        });
+    });
+    console.log('Number of stations:', count);
+    return count;
+}
+async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number; Time: number }>> {
     const command = `
         SELECT connections.toStationId, lines.lineId, connections.Time
         FROM connections
@@ -33,9 +51,9 @@ async function retrieveStations(stationId?: number): Promise<void> {
         FULL JOIN lines ON connections.lineId = lines.lineId
         WHERE fromStationId = ?
     `;
+    const stations: Array<{ toStationId: number; lineId: number; Time: number }> = [];
     databaseInstance?.transaction(tx => {
         tx.executeSql(command, [stationId], (tx, results) => {
-            const stations = [];
             for (let i = 0; i < results.rows.length; i++) {
                 const row = results.rows.item(i);
                 const { toStationId, lineId, Time } = row;
@@ -44,4 +62,6 @@ async function retrieveStations(stationId?: number): Promise<void> {
             console.log('Stations retrieved:', stations);
         });
     });
-}
+
+    return stations;
+} 
