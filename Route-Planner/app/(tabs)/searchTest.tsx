@@ -2,7 +2,7 @@ import { Button, StyleSheet, TextInput } from 'react-native';
 
 import { Database } from '@/components/database';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { PathFinderResult } from '@/components/pathFinder';
+import { computeShortestPath } from '@/components/pathFinder';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as React from 'react';
@@ -46,8 +46,9 @@ export default function TabTwoScreen() {
       />
       <Button
         title="Find Path"
-        onPress={() => PathFinderResult.useDijkstra(1, 10)}
-
+        onPress={() => {
+          computeShortestPath(1, 10).then(res => console.log('Path result:', res)).catch(err => console.error(err));
+        }}
       />
 
     </ParallaxScrollView>

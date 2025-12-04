@@ -1,67 +1,112 @@
-import { createContext, useContext, useEffect, useState } from 'react';
 import SQLite from 'react-native-sqlite-storage';
 
-let databaseInstance: SQLite.SQLiteDatabase | undefined;
+SQLite.enablePromise(true);
+
+let databaseInstance: SQLite.SQLiteDatabase | null = null;
 
 export interface Database {
     open(): Promise<SQLite.SQLiteDatabase>;
-    retrieveStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number; Time: number }>>;
-    countStations(): number;
-};
+    retrieveStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number | null; Time: number }>>;
+    countStations(): Promise<number>;
+    retrieveStationCoordinate(stationId: number): Promise<[number, number]>;
+}
 
 export const Database: Database = {
     open,
     retrieveStations: retrieveNeighbourStations,
     countStations: countNumberOfStations,
+    retrieveStationCoordinate: retrieveStationCoordinate,
+};
+
+async function retrieveStationCoordinate(stationId: number): Promise<[number, number]> {
+    const command = `
+        SELECT latitude, longitude 
+        FROM stations
+        WHERE stationId = ?; 
+        `;
+    const db = await open();
+    try {
+        const [result] = await db.executeSql(command, [stationId]);
+        if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+            return [row.latitude, row.longitude];
+        } else {
+            throw new Error(`Station with ID ${stationId} not found.`);
+        }
+    } catch (err) {
+        console.error('Error retrieving station coordinates:', err);
+        throw err;
+    }
 }
+
 
 async function open(): Promise<SQLite.SQLiteDatabase> {
-    if (databaseInstance) {
-        return databaseInstance;
+    if (databaseInstance) return databaseInstance;
+    try {
+        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV3.db', createFromLocation: 1, readOnly: true });
+        databaseInstance = db;
+        return db;
+    } catch (err) {
+        console.error('Error opening database:', err);
+        throw err;
     }
-    SQLite.enablePromise(true);
-    const db = await SQLite.openDatabase(
-        { name: 'LondonUndergroundTestV3.db', createFromLocation: 1, readOnly: true },
-        opened => console.log('Database opened successfully'),
-        error => console.error('Error opening database: ', error)
-    );
-
-    databaseInstance = db;
-    return db;
 }
-function countNumberOfStations(): number {
+
+async function countNumberOfStations(): Promise<number> {
     const command = `SELECT COUNT(*) as count FROM stations`;
-    var count = -1;
-    databaseInstance?.transaction(tx => {
-        tx.executeSql(command, [], (tx, results) => {
-            var count = results.rows.item(0).count;
-            console.log('Number of stations:', count);
-        }, (tx, error) => {
-            console.error('Error counting stations: ', error);
-        });
-    });
-    console.log('Number of stations:', count);
-    return count;
+    const db = await open();
+    try {
+        const [result] = await db.executeSql(command);
+        const count = result.rows.item(0).count;
+        return Number(count);
+    } catch (err) {
+        console.error('Error counting stations:', err);
+        throw err;
+    }
 }
-async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number; Time: number }>> {
-    const command = `
-        SELECT connections.toStationId, lines.lineId, connections.Time
-        FROM connections
-        FULL JOIN stations ON stations.stationId = connections.toStationId
-        FULL JOIN lines ON connections.lineId = lines.lineId
-        WHERE fromStationId = ?
-    `;
-    const stations: Array<{ toStationId: number; lineId: number; Time: number }> = [];
-    databaseInstance?.transaction(tx => {
-        tx.executeSql(command, [stationId], (tx, results) => {
-            for (let i = 0; i < results.rows.length; i++) {
-                const row = results.rows.item(i);
-                const { toStationId, lineId, Time } = row;
-                stations.push({ toStationId, lineId, Time });
-            }
-            console.log('Stations retrieved:', stations);
-        });
-    });
 
-    return stations;
-} 
+async function retrieveConnectionTime(fromStationId: number, toStationId: number, lineId: number): Promise<number> {
+    const command = `
+        SELECT travelTime
+        FROM connections
+        WHERE fromStationId = ? AND toStationId = ? AND lineId = ?;
+        `;
+    const db = await open();
+    try {
+        const [result] = await db.executeSql(command, [fromStationId, toStationId, lineId]);
+        if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+            return row.travelTime;
+        }
+        else {
+            throw new Error(`Connection from station ${fromStationId} to station ${toStationId} not found.`);
+        }
+    } catch (err) {
+        console.error('Error retrieving connection time:', err);
+        throw err;
+    }
+}
+
+async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number | null; Time: number }>> {
+    // LEFT JOIN to get line information
+    const command = `
+        SELECT connections.toStationId, lines.lineId AS lineId, connections.Time
+        FROM connections
+        LEFT JOIN lines ON connections.lineId = lines.lineId
+        WHERE connections.fromStationId = ?
+        `;
+
+    const db = await open();
+    try {
+        const [result] = await db.executeSql(command, [stationId]);
+        const stations: Array<{ toStationId: number; lineId: number; Time: number }> = [];
+        for (let i = 0; i < result.rows.length; i++) {
+            const row = result.rows.item(i);
+            stations.push({ toStationId: row.toStationId, lineId: row.lineId, Time: row.Time });
+        }
+        return stations;
+    } catch (err) {
+        console.error('Error retrieving neighbour stations:', err);
+        throw err;
+    }
+}
