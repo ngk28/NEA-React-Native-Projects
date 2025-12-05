@@ -8,7 +8,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as React from 'react';
 
 export default function TabTwoScreen() {
-  const [searchText, onChangeSearchText] = React.useState('Search...');
+  const [searchText, onChangeSearchText] = React.useState('');
 
   const DatabaseContext = React.createContext<Database | null>(null);
 
@@ -47,7 +47,9 @@ export default function TabTwoScreen() {
       <Button
         title="Find Path"
         onPress={() => {
-          computeShortestPath(1, 10).then(res => console.log('Path result:', res)).catch(err => console.error(err));
+          computeShortestPath(227, 235).then(
+            res => console.log('Path result:', res))
+            .catch(err => console.error(err));
         }}
       />
 

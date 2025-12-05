@@ -20,6 +20,15 @@ function HaversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     const distance = R * c; // in metres
     return distance / 1000; // return in kilometres
 }
+function reconstructPath(previous: Map<number, number | null>, toStationId: number): number[] {
+    const path: number[] = [];
+    let currentStationId: number | null = toStationId;
+    while (currentStationId !== null) {
+        path.unshift(currentStationId);
+        currentStationId = previous.get(currentStationId) || null;
+    }
+    return path;
+}
 
 export async function computeShortestPath(fromStationId: number, toStationId: number): Promise<PathFinderResult> {
     // const neighbours = await Database.retrieveStations(fromStationId);
@@ -33,27 +42,44 @@ export async function computeShortestPath(fromStationId: number, toStationId: nu
     const queue: Array<{ stationId: number; distance: number }> = [];
 
     var estimatedCost = HaversineDistance(fromStationLat, fromStationLon, toStationLat, toStationLon);
-    distances.set(fromStationId, estimatedCost);
+    distances.set(fromStationId, 0);
     queue.push({ stationId: fromStationId, distance: estimatedCost });
 
     while (queue.length > 0) {
         queue.sort((a, b) => a.distance - b.distance); // TODO: Optimize the queue to always get the node with the smallest distance without sorting
         const current = queue.shift()!;
         if (current.stationId === toStationId) {
-            // TODO: Reconstruct path
-            return { shortestPath: [], totalTime: 1 };
+            const shortestPath = reconstructPath(previous, toStationId);
+            const totalTime = distances.get(toStationId) ?? 0;
+            const stationsEvaluated = visited.size;
+            console.log(`Stations visited: ${stationsEvaluated}`);
+            const stationsInQueue = queue.length;
+            console.log(`Stations remaining in queue: ${stationsInQueue}`);
+            return { shortestPath, totalTime };
         }
         visited.add(current.stationId);
-        const neighbours = await Database.retrieveStations(current.stationId);
+        const neighbours = await Database.retrieveNeighbourStations(current.stationId);
         for (const neighbour of neighbours) {
-            if (visited.has(neighbour.toStationId)) continue;
+            if (visited.has(neighbour.toStationId)) {
+                continue;
+            }
             const [neighbourLat, neighbourLon] = await Database.retrieveStationCoordinate(neighbour.toStationId);
-            const tentativeDistance = current.distance + neighbour.Time;
-            if differentLine 
-
-            return { shortestPath: [], totalTime: 0 };
+            const tentativeDistance = distances.get(current.stationId)! + neighbour.travelTime;
+            const estimatedCost = HaversineDistance(neighbourLat, neighbourLon, toStationLat, toStationLon);
+            // if differentLine 
+            if (queue.findIndex(item => item.stationId === neighbour.toStationId) === -1) {
+                queue.push({ stationId: neighbour.toStationId, distance: tentativeDistance + estimatedCost });
+            }
+            else if (tentativeDistance >= (distances.get(neighbour.toStationId) || Infinity)) {
+                // Path is worse
+                continue;
+            }
+            // Path is better
+            distances.set(neighbour.toStationId, tentativeDistance);
+            previous.set(neighbour.toStationId, current.stationId);
         }
     }
+    return { shortestPath: [], totalTime: 1000 };
 }
 
 // Hook wrapper for components that need reactive results.
@@ -72,6 +98,8 @@ export function useDijkstra(fromStationId: number | null, toStationId: number | 
             .then(result => {
                 setShortestPath(result.shortestPath);
                 setTotalTime(result.totalTime);
+                console.log('From station ID:', fromStationId, 'To station ID:', toStationId);
+                console.log('Shortest path:', result.shortestPath, 'Total time:', result.totalTime);
             })
             .catch(err => {
                 setError(err instanceof Error ? err : new Error(String(err)));

@@ -6,16 +6,18 @@ let databaseInstance: SQLite.SQLiteDatabase | null = null;
 
 export interface Database {
     open(): Promise<SQLite.SQLiteDatabase>;
-    retrieveStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number | null; Time: number }>>;
+    retrieveNeighbourStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number; travelTime: number }>>;
     countStations(): Promise<number>;
     retrieveStationCoordinate(stationId: number): Promise<[number, number]>;
+    retrieveStationName(stationId: number): Promise<string>;
 }
 
 export const Database: Database = {
     open,
-    retrieveStations: retrieveNeighbourStations,
+    retrieveNeighbourStations: retrieveNeighbourStations,
     countStations: countNumberOfStations,
     retrieveStationCoordinate: retrieveStationCoordinate,
+    retrieveStationName: retrieveStationName,
 };
 
 async function retrieveStationCoordinate(stationId: number): Promise<[number, number]> {
@@ -43,7 +45,7 @@ async function retrieveStationCoordinate(stationId: number): Promise<[number, nu
 async function open(): Promise<SQLite.SQLiteDatabase> {
     if (databaseInstance) return databaseInstance;
     try {
-        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV3.db', createFromLocation: 1, readOnly: true });
+        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV4.db', createFromLocation: 1, readOnly: true });
         databaseInstance = db;
         return db;
     } catch (err) {
@@ -61,6 +63,27 @@ async function countNumberOfStations(): Promise<number> {
         return Number(count);
     } catch (err) {
         console.error('Error counting stations:', err);
+        throw err;
+    }
+}
+
+async function retrieveStationName(stationId: number): Promise<string> {
+    const command = `
+        SELECT stationName
+        FROM stations
+        WHERE stationId = ?; 
+        `;
+    const db = await open();
+    try {
+        const [result] = await db.executeSql(command, [stationId]);
+        if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+            return row.stationName;
+        } else {
+            throw new Error(`Station with ID ${stationId} not found.`);
+        }
+    } catch (err) {
+        console.error('Error retrieving station name:', err);
         throw err;
     }
 }
@@ -87,10 +110,10 @@ async function retrieveConnectionTime(fromStationId: number, toStationId: number
     }
 }
 
-async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number | null; Time: number }>> {
+async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number; travelTime: number }>> {
     // LEFT JOIN to get line information
     const command = `
-        SELECT connections.toStationId, lines.lineId AS lineId, connections.Time
+        SELECT connections.toStationId, lines.lineId AS lineId, connections.travelTime
         FROM connections
         LEFT JOIN lines ON connections.lineId = lines.lineId
         WHERE connections.fromStationId = ?
@@ -99,10 +122,10 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toS
     const db = await open();
     try {
         const [result] = await db.executeSql(command, [stationId]);
-        const stations: Array<{ toStationId: number; lineId: number; Time: number }> = [];
+        const stations: Array<{ toStationId: number; lineId: number; travelTime: number }> = [];
         for (let i = 0; i < result.rows.length; i++) {
             const row = result.rows.item(i);
-            stations.push({ toStationId: row.toStationId, lineId: row.lineId, Time: row.Time });
+            stations.push({ toStationId: row.toStationId, lineId: row.lineId, travelTime: row.travelTime });
         }
         return stations;
     } catch (err) {
