@@ -8,16 +8,17 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as React from 'react';
 
 export default function TabTwoScreen() {
-  const [searchText, onChangeSearchText] = React.useState('');
+  const [startingPoint, onChangeStartingPoint] = React.useState('');
+  const [destination, onChangeDestination] = React.useState('');
 
   const DatabaseContext = React.createContext<Database | null>(null);
 
   React.useEffect(function () {
-    Database.open().then((db) => {
-      console.log('Database opened in context');
-    }, (error) => {
-      console.error('Error opening database in context: ', error);
-    });
+    // Database.open().then((db) => {
+    //   console.log('Database opened in context');
+    // }, (error) => {
+    //   console.error('Error opening database in context: ', error);
+    // });
 
   }, []);
 
@@ -33,21 +34,28 @@ export default function TabTwoScreen() {
           style={styles.headerImage}
         />
       }>
-      <ThemedText> Trial  </ThemedText>
+      <ThemedText> Trial </ThemedText>
 
       <TextInput
         style={{
           height: 40,
         }}
-        onChangeText={onChangeSearchText}
-        value={searchText}
+        onChangeText={onChangeStartingPoint}
+        value={startingPoint}
         placeholder='Starting Point'
-
+      />
+      <TextInput
+        style={{
+          height: 40,
+        }}
+        onChangeText={onChangeDestination}
+        value={destination}
+        placeholder='Destination'
       />
       <Button
         title="Find Path"
         onPress={() => {
-          computeShortestPath(227, 235).then(
+          computeShortestPath(37, 97).then(
             res => console.log('Path result:', res))
             .catch(err => console.error(err));
         }}

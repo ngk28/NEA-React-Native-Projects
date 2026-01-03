@@ -10,6 +10,7 @@ export interface Database {
     countStations(): Promise<number>;
     retrieveStationCoordinate(stationId: number): Promise<[number, number]>;
     retrieveStationName(stationId: number): Promise<string>;
+    retrieveTransferTime(fromStationId: number, toStationId: number, lineId: number): Promise<number>;
 }
 
 export const Database: Database = {
@@ -18,6 +19,7 @@ export const Database: Database = {
     countStations: countNumberOfStations,
     retrieveStationCoordinate: retrieveStationCoordinate,
     retrieveStationName: retrieveStationName,
+    retrieveTransferTime: retrieveTransferTime,
 };
 
 async function retrieveStationCoordinate(stationId: number): Promise<[number, number]> {
@@ -45,7 +47,7 @@ async function retrieveStationCoordinate(stationId: number): Promise<[number, nu
 async function open(): Promise<SQLite.SQLiteDatabase> {
     if (databaseInstance) return databaseInstance;
     try {
-        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV4.db', createFromLocation: 1, readOnly: true });
+        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV5.db', createFromLocation: 1, readOnly: true });
         databaseInstance = db;
         return db;
     } catch (err) {
@@ -88,30 +90,8 @@ async function retrieveStationName(stationId: number): Promise<string> {
     }
 }
 
-async function retrieveConnectionTime(fromStationId: number, toStationId: number, lineId: number): Promise<number> {
-    const command = `
-        SELECT travelTime
-        FROM connections
-        WHERE fromStationId = ? AND toStationId = ? AND lineId = ?;
-        `;
-    const db = await open();
-    try {
-        const [result] = await db.executeSql(command, [fromStationId, toStationId, lineId]);
-        if (result.rows.length > 0) {
-            const row = result.rows.item(0);
-            return row.travelTime;
-        }
-        else {
-            throw new Error(`Connection from station ${fromStationId} to station ${toStationId} not found.`);
-        }
-    } catch (err) {
-        console.error('Error retrieving connection time:', err);
-        throw err;
-    }
-}
-
 async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toStationId: number; lineId: number; travelTime: number }>> {
-    // LEFT JOIN to get line information
+    // Left join to connect databases
     const command = `
         SELECT connections.toStationId, lines.lineId AS lineId, connections.travelTime
         FROM connections
@@ -131,5 +111,44 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toS
     } catch (err) {
         console.error('Error retrieving neighbour stations:', err);
         throw err;
+    }
+}
+
+async function retrieveTransferTime(stationId: number, fromLineId: number | null, toLineId: number): Promise<number> {
+    // If we are starting a journey (no incoming line), there is no transfer time.
+    if (fromLineId === null) return 0;
+
+    const DEFAULT_TRANSFER_PENALTY = 4; // minutes
+
+    const db = await open();
+
+    // Try one way first (fromLineId -> toLineId)
+    const directQuery = `
+        SELECT transferTime
+        FROM transfers
+        WHERE stationId = ? AND fromLineId = ? AND toLineId = ?;
+    `;
+    // Try other way (toLineId -> fromLineId)
+    const symmetricQuery = `
+        SELECT transferTime
+        FROM transfers
+        WHERE stationId = ? AND fromLineId = ? AND toLineId = ?;
+    `;
+    try {
+        const [res1] = await db.executeSql(directQuery, [stationId, fromLineId, toLineId]);
+        if (res1.rows.length > 0) {
+            const row = res1.rows.item(0);
+            return Number(row.transferTime);
+        }
+        const [res2] = await db.executeSql(symmetricQuery, [stationId, toLineId, fromLineId]);
+        if (res2.rows.length > 0) {
+            const row = res2.rows.item(0);
+            return Number(row.transferTime);
+        }
+        console.warn(`No transfer time found for stationId ${stationId} between lines ${fromLineId} and ${toLineId}. Using default penalty.`);
+        return DEFAULT_TRANSFER_PENALTY;
+    } catch (err) {
+        console.error('Error retrieving transfer time:', err);
+        return DEFAULT_TRANSFER_PENALTY;
     }
 }

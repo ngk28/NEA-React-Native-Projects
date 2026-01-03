@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { Database } from '@/components/database';
+import { useEffect, useState } from 'react';
 
 export type PathFinderResult = {
     shortestPath: number[];
@@ -32,21 +32,22 @@ function reconstructPath(previous: Map<number, number | null>, toStationId: numb
 
 export async function computeShortestPath(fromStationId: number, toStationId: number): Promise<PathFinderResult> {
     // const neighbours = await Database.retrieveStations(fromStationId);
-    // TODO: implement Dijkstra using Database.retrieveStations
     const visited = new Set<number>();
     const previous = new Map<number, number | null>();
     const distances = new Map<number, number>();
     const [toStationLat, toStationLon] = await Database.retrieveStationCoordinate(toStationId);
     const [fromStationLat, fromStationLon] = await Database.retrieveStationCoordinate(fromStationId);
+    var currentlineId: number | null = null;
 
-    const queue: Array<{ stationId: number; distance: number }> = [];
+    const queue: Array<{ stationId: number; distance: number, lineId: number | null }> = [];
 
     var estimatedCost = HaversineDistance(fromStationLat, fromStationLon, toStationLat, toStationLon);
     distances.set(fromStationId, 0);
-    queue.push({ stationId: fromStationId, distance: estimatedCost });
+    queue.push({ stationId: fromStationId, distance: estimatedCost, lineId: null });
+    // Can start from any line without time punishment 
 
     while (queue.length > 0) {
-        queue.sort((a, b) => a.distance - b.distance); // TODO: Optimize the queue to always get the node with the smallest distance without sorting
+        queue.sort((a, b) => a.distance - b.distance); // Optional Extension todo?: Optimize queue to a priority queue to - always get node with the smallest distance without sorting
         const current = queue.shift()!;
         if (current.stationId === toStationId) {
             const shortestPath = reconstructPath(previous, toStationId);
@@ -64,25 +65,39 @@ export async function computeShortestPath(fromStationId: number, toStationId: nu
                 continue;
             }
             const [neighbourLat, neighbourLon] = await Database.retrieveStationCoordinate(neighbour.toStationId);
-            const tentativeDistance = distances.get(current.stationId)! + neighbour.travelTime;
+            var tentativeDistance = distances.get(current.stationId)! + neighbour.travelTime;
             const estimatedCost = HaversineDistance(neighbourLat, neighbourLon, toStationLat, toStationLon);
-            // if differentLine 
+
+            // if differentLine, add per-station/per-line transfer time
+            if (current.lineId !== null && neighbour.lineId !== current.lineId) {
+                try {
+                    const transferTime = await Database.retrieveTransferTime(current.stationId, current.lineId, neighbour.lineId);
+                    tentativeDistance += transferTime;
+                } catch (error) {
+                    console.error('Error retrieving transfer time:', error);
+                }
+            }
+
+            // TODO : Check queue logic?? only checks against stationId, not lineId nor optimises distance properly
             if (queue.findIndex(item => item.stationId === neighbour.toStationId) === -1) {
-                queue.push({ stationId: neighbour.toStationId, distance: tentativeDistance + estimatedCost });
+                if (queue.at(queue.findIndex(item => item.stationId === neighbour.toStationId))?.lineId !== neighbour.lineId) {
+                    queue.push({ stationId: neighbour.toStationId, distance: tentativeDistance + estimatedCost, lineId: neighbour.lineId });
+                }
+                else if (tentativeDistance >= (distances.get(neighbour.toStationId) || Infinity)) {
+                    // Path is worse
+                    continue;
+                }
+
+                // Path is better
+                distances.set(neighbour.toStationId, tentativeDistance);
+                previous.set(neighbour.toStationId, current.stationId);
             }
-            else if (tentativeDistance >= (distances.get(neighbour.toStationId) || Infinity)) {
-                // Path is worse
-                continue;
-            }
-            // Path is better
-            distances.set(neighbour.toStationId, tentativeDistance);
-            previous.set(neighbour.toStationId, current.stationId);
         }
     }
     return { shortestPath: [], totalTime: 1000 };
 }
 
-// Hook wrapper for components that need reactive results.
+
 export function useDijkstra(fromStationId: number | null, toStationId: number | null) {
     const [shortestPath, setShortestPath] = useState<number[]>([]);
     const [totalTime, setTotalTime] = useState<number>(0);
@@ -110,4 +125,5 @@ export function useDijkstra(fromStationId: number | null, toStationId: number | 
     }, [fromStationId, toStationId]);
 
     return { shortestPath, totalTime, loading, error } as const;
+
 }
