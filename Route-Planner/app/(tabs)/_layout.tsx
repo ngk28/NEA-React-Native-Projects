@@ -16,10 +16,11 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
       }}>
+
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Search',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
@@ -31,10 +32,9 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="searchTest"
+        name="disruption"
         options={{
-          title: 'Search',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} />,
+          title: 'Disruptions',
         }}
       />
     </Tabs>

@@ -1,98 +1,194 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Button, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { HelloWave } from '@/components/hello-wave';
+import { Database } from '@/components/database';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { computeShortestPath } from '@/components/pathFinder';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { IconSymbol } from '@/components/ui/icon-symbol';
+import * as React from 'react';
 
-export default function HomeScreen() {
+export default function TabTwoScreen() {
+  // Process
+  const [startQuery, setStartQuery] = React.useState('');
+  const [destQuery, setDestQuery] = React.useState('');
+  // Search results given a text input - station not confirmed by user yet
+  const [startMatches, setStartMatches] = React.useState<Array<{ stationId: number; stationName: string }>>([]);
+  const [destMatches, setDestMatches] = React.useState<Array<{ stationId: number; stationName: string }>>([]);
+  // Confirmed station selection by user
+  const [selectedStart, setSelectedStart] = React.useState<{ stationId: number; stationName: string } | null>(null);
+  const [selectedDest, setSelectedDest] = React.useState<{ stationId: number; stationName: string } | null>(null);
+  // React Native loading states
+  const [loadingStart, setLoadingStart] = React.useState(false);
+  const [loadingDest, setLoadingDest] = React.useState(false);
+
+  const [shortestPath, setShortestPath] = React.useState<Array<number>>([]);
+  const [shortestTime, setShortestTime] = React.useState<number>(0);
+
+  React.useEffect(() => {
+    if (startQuery.trim().length < 2) { // Too short to search
+      setStartMatches([]); // Clears any previous matches 
+      return;
+    }
+    setLoadingStart(true); // React Native set loading state (program knows we're searching)
+    Database.retrieveStationsByName(startQuery)
+      .then(setStartMatches)
+      .catch((err) => console.error('Start search failed:', err))
+      .finally(() => setLoadingStart(false));
+  }, [startQuery]);
+
+  React.useEffect(() => {
+    if (destQuery.trim().length < 2) { // Too short to search
+      setDestMatches([]); // Clears any previous matches
+      return;
+    }
+    setLoadingDest(true);
+    Database.retrieveStationsByName(destQuery)
+      .then(setDestMatches)
+      .catch((err) => console.error('Destination search failed:', err))
+      .finally(() => setLoadingDest(false));
+  }, [destQuery]);
+
+
+  const handleSelectStart = (station: { stationId: number; stationName: string }) => {
+    setSelectedStart(station);
+    setStartQuery(station.stationName);
+    setStartMatches([]);
+  };
+
+  const handleSelectDest = (station: { stationId: number; stationName: string }) => {
+    setSelectedDest(station);
+    setDestQuery(station.stationName);
+    setDestMatches([]);
+  };
+
+  const handleFindPath = () => {
+    if (!selectedStart || !selectedDest) {
+      console.warn('Pick both stations before searching.');
+      return;
+    }
+
+    computeShortestPath(selectedStart.stationId, selectedDest.stationId)
+      .then((result) => {
+        console.log('Path result:', result);
+        setShortestPath(result.shortestPath);
+        setShortestTime(result.totalTime);
+      })
+      .catch((err) => console.error(err));
+  };
+
+
+
   return (
     <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
+      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
       headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+        <IconSymbol
+          size={310}
+          color="#808080"
+          name="chevron.left.forwardslash.chevron.right"
+          style={styles.headerImage}
         />
       }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
+      <ThemedText>Choose stations to plan a route.</ThemedText>
+
+      <View style={styles.fieldGroup}>
+        <TextInput
+          style={styles.input}
+          onChangeText={(text) => {
+            setStartQuery(text);
+            setSelectedStart(null);
+          }}
+          value={startQuery}
+          placeholder='Starting station'
+          autoCorrect={false}
+        />
+
+        {loadingStart && <Text style={styles.helper}>Searching…</Text>}
+        {!loadingStart && selectedStart && <Text style={styles.helper}>Selected: {selectedStart.stationName}</Text>}
+
+        {selectedStart === null && (
+          <FlatList
+            data={startMatches}
+            keyExtractor={(item) => String(item.stationId)}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.listItem} onPress={() => handleSelectStart(item)}>
+                <Text>{item.stationName}</Text>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={startQuery.trim().length >= 2 && !loadingStart ? <Text style={styles.helper}>No matches</Text> : null}
+          />
+        )}
+      </View>
+
+      <View style={styles.fieldGroup}>
+        <TextInput
+          style={styles.input}
+          onChangeText={(text) => {
+            setDestQuery(text);
+            setSelectedDest(null);
+          }}
+          value={destQuery}
+          placeholder='Destination station'
+          autoCorrect={false}
+        />
+
+        {loadingDest && <Text style={styles.helper}>Searching…</Text>}
+        {!loadingDest && selectedDest && <Text style={styles.helper}>Selected: {selectedDest.stationName}</Text>}
+
+        {selectedDest === null && (
+          <FlatList
+            data={destMatches}
+            keyExtractor={(item) => String(item.stationId)}
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.listItem} onPress={() => handleSelectDest(item)}>
+                <Text>{item.stationName}</Text>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={destQuery.trim().length >= 2 && selectedDest === null && !loadingDest ? <Text style={styles.helper}>No matches</Text> : null}
+          />
+        )}
+      </View>
+
+      <Button
+        title="Find Path"
+        onPress={handleFindPath}
+      />
+
     </ParallaxScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  headerImage: {
+    color: '#808080',
+    bottom: -90,
+    left: -35,
+    position: 'absolute',
+  },
   titleContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 8,
   },
-  stepContainer: {
+  fieldGroup: {
+    marginBottom: 16,
     gap: 8,
-    marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  input: {
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+  },
+  listItem: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ddd',
+  },
+  helper: {
+    color: '#666',
   },
 });

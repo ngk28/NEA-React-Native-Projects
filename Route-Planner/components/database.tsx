@@ -11,6 +11,7 @@ export interface Database {
     retrieveStationCoordinate(stationId: number): Promise<[number, number]>;
     retrieveStationName(stationId: number): Promise<string>;
     retrieveTransferTime(fromStationId: number, toStationId: number, lineId: number): Promise<number>;
+    retrieveStationsByName(searchTerm: string): Promise<Array<{ stationId: number; stationName: string }>>;
 }
 
 export const Database: Database = {
@@ -20,6 +21,7 @@ export const Database: Database = {
     retrieveStationCoordinate: retrieveStationCoordinate,
     retrieveStationName: retrieveStationName,
     retrieveTransferTime: retrieveTransferTime,
+    retrieveStationsByName: retrieveStationsByName,
 };
 
 async function retrieveStationCoordinate(stationId: number): Promise<[number, number]> {
@@ -37,22 +39,21 @@ async function retrieveStationCoordinate(stationId: number): Promise<[number, nu
         } else {
             throw new Error(`Station with ID ${stationId} not found.`);
         }
-    } catch (err) {
-        console.error('Error retrieving station coordinates:', err);
-        throw err;
+    } catch (error) {
+        console.error('Error retrieving station coordinates:', error);
+        throw error;
     }
 }
-
 
 async function open(): Promise<SQLite.SQLiteDatabase> {
     if (databaseInstance) return databaseInstance;
     try {
-        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV5.db', createFromLocation: 1, readOnly: true });
+        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV6.db', createFromLocation: 1, readOnly: true });
         databaseInstance = db;
         return db;
-    } catch (err) {
-        console.error('Error opening database:', err);
-        throw err;
+    } catch (error) {
+        console.error('Error opening database:', error);
+        throw error;
     }
 }
 
@@ -63,9 +64,9 @@ async function countNumberOfStations(): Promise<number> {
         const [result] = await db.executeSql(command);
         const count = result.rows.item(0).count;
         return Number(count);
-    } catch (err) {
-        console.error('Error counting stations:', err);
-        throw err;
+    } catch (error) {
+        console.error('Error counting stations:', error);
+        throw error;
     }
 }
 
@@ -84,9 +85,9 @@ async function retrieveStationName(stationId: number): Promise<string> {
         } else {
             throw new Error(`Station with ID ${stationId} not found.`);
         }
-    } catch (err) {
-        console.error('Error retrieving station name:', err);
-        throw err;
+    } catch (error) {
+        console.error('Error retrieving station name:', error);
+        throw error;
     }
 }
 
@@ -108,14 +109,14 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toS
             stations.push({ toStationId: row.toStationId, lineId: row.lineId, travelTime: row.travelTime });
         }
         return stations;
-    } catch (err) {
-        console.error('Error retrieving neighbour stations:', err);
-        throw err;
+    } catch (error) {
+        console.error('Error retrieving neighbour stations:', error);
+        throw error;
     }
 }
 
 async function retrieveTransferTime(stationId: number, fromLineId: number | null, toLineId: number): Promise<number> {
-    // If we are starting a journey (no incoming line), there is no transfer time.
+    // If we are starting a journey (no incoming line), there is no transfer time
     if (fromLineId === null) return 0;
 
     const DEFAULT_TRANSFER_PENALTY = 4; // minutes
@@ -129,26 +130,49 @@ async function retrieveTransferTime(stationId: number, fromLineId: number | null
         WHERE stationId = ? AND fromLineId = ? AND toLineId = ?;
     `;
     // Try other way (toLineId -> fromLineId)
-    const symmetricQuery = `
+    const reverseQuery = `
         SELECT transferTime
         FROM transfers
         WHERE stationId = ? AND fromLineId = ? AND toLineId = ?;
     `;
     try {
-        const [res1] = await db.executeSql(directQuery, [stationId, fromLineId, toLineId]);
-        if (res1.rows.length > 0) {
-            const row = res1.rows.item(0);
+        const [result1] = await db.executeSql(directQuery, [stationId, fromLineId, toLineId]);
+        if (result1.rows.length > 0) {
+            const row = result1.rows.item(0);
             return Number(row.transferTime);
         }
-        const [res2] = await db.executeSql(symmetricQuery, [stationId, toLineId, fromLineId]);
-        if (res2.rows.length > 0) {
-            const row = res2.rows.item(0);
+        const [result2] = await db.executeSql(reverseQuery, [stationId, toLineId, fromLineId]);
+        if (result2.rows.length > 0) {
+            const row = result2.rows.item(0);
             return Number(row.transferTime);
         }
         console.warn(`No transfer time found for stationId ${stationId} between lines ${fromLineId} and ${toLineId}. Using default penalty.`);
         return DEFAULT_TRANSFER_PENALTY;
-    } catch (err) {
-        console.error('Error retrieving transfer time:', err);
+    } catch (error) {
+        console.error('Error retrieving transfer time:', error);
         return DEFAULT_TRANSFER_PENALTY;
+    }
+}
+
+async function retrieveStationsByName(searchTerm: string): Promise<Array<{ stationId: number; stationName: string }>> {
+    const command = `
+        SELECT stationId, stationName
+        FROM stations
+        WHERE stationName LIKE ?
+        ORDER BY stationName ASC
+    `;
+
+    const db = await open();
+    try {
+        const [result] = await db.executeSql(command, [`${searchTerm}%`]);
+        const stations: Array<{ stationId: number; stationName: string }> = [];
+        for (let i = 0; i < result.rows.length; i++) {
+            const row = result.rows.item(i);
+            stations.push({ stationId: row.stationId, stationName: row.stationName });
+        }
+        return stations;
+    } catch (error) {
+        console.error('Error retrieving stations by name:', error);
+        throw error;
     }
 }
