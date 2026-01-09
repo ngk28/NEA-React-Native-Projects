@@ -12,6 +12,7 @@ export interface Database {
     retrieveStationName(stationId: number): Promise<string>;
     retrieveTransferTime(fromStationId: number, toStationId: number, lineId: number): Promise<number>;
     retrieveStationsByName(searchTerm: string): Promise<Array<{ stationId: number; stationName: string }>>;
+    retrieveLineName(lineId: number): Promise<string>;
 }
 
 export const Database: Database = {
@@ -22,6 +23,7 @@ export const Database: Database = {
     retrieveStationName: retrieveStationName,
     retrieveTransferTime: retrieveTransferTime,
     retrieveStationsByName: retrieveStationsByName,
+    retrieveLineName: retrieveLineName,
 };
 
 async function retrieveStationCoordinate(stationId: number): Promise<[number, number]> {
@@ -116,7 +118,7 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toS
 }
 
 async function retrieveTransferTime(stationId: number, fromLineId: number | null, toLineId: number): Promise<number> {
-    // If we are starting a journey (no incoming line), there is no transfer time
+    // If starting a journey (no incoming line), there is no transfer time
     if (fromLineId === null) return 0;
 
     const DEFAULT_TRANSFER_PENALTY = 4; // minutes
@@ -151,6 +153,26 @@ async function retrieveTransferTime(stationId: number, fromLineId: number | null
     } catch (error) {
         console.error('Error retrieving transfer time:', error);
         return DEFAULT_TRANSFER_PENALTY;
+    }
+}
+async function retrieveLineName(lineId: number): Promise<string> {
+    const command = `
+        SELECT lineName
+        FROM lines
+        WHERE lineId = ?;
+    `;
+    const db = await open();
+    try {
+        const [result] = await db.executeSql(command, [lineId]);
+        if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+            return row.lineName;
+        } else {
+            throw new Error(`Line with ID ${lineId} not found.`);
+        }
+    } catch (error) {
+        console.error('Error retrieving line name:', error);
+        throw error;
     }
 }
 

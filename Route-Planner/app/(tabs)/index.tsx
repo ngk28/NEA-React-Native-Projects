@@ -2,7 +2,7 @@ import { Button, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View }
 
 import { Database } from '@/components/database';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { computeShortestPath } from '@/components/pathFinder';
+import { getCachedPath, retrievePathByStationId } from '@/components/pathFinder';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import * as React from 'react';
@@ -61,19 +61,25 @@ export default function TabTwoScreen() {
     setDestMatches([]);
   };
 
-  const handleFindPath = () => {
+  const handleFindPath = async () => {
     if (!selectedStart || !selectedDest) {
       console.warn('Pick both stations before searching.');
       return;
     }
 
-    computeShortestPath(selectedStart.stationId, selectedDest.stationId)
-      .then((result) => {
-        console.log('Path result:', result);
-        setShortestPath(result.shortestPath);
-        setShortestTime(result.totalTime);
-      })
-      .catch((err) => console.error(err));
+    console.log('Finding path from', selectedStart.stationName, 'to', selectedDest.stationName);
+    try {
+      const path = await retrievePathByStationId(selectedStart.stationId, selectedDest.stationId);
+      console.log('Shortest path found:', path);
+      setShortestPath(path);
+      // Get cached result instead of recalculating
+      const cached = getCachedPath();
+      if (cached) {
+        setShortestTime(cached.totalTime);
+      }
+    } catch (error) {
+      console.error('Failed to retrieve shortest path:', error);
+    }
   };
 
 
