@@ -13,6 +13,7 @@ export interface Database {
     retrieveTransferTime(fromStationId: number, toStationId: number, lineId: number): Promise<number>;
     retrieveStationsByName(searchTerm: string): Promise<Array<{ stationId: number; stationName: string }>>;
     retrieveLineName(lineId: number): Promise<string>;
+    retrieveNaptanId(stationId: number): Promise<string>;
 }
 
 export const Database: Database = {
@@ -24,6 +25,7 @@ export const Database: Database = {
     retrieveTransferTime: retrieveTransferTime,
     retrieveStationsByName: retrieveStationsByName,
     retrieveLineName: retrieveLineName,
+    retrieveNaptanId: retrieveNaptanId,
 };
 
 async function retrieveStationCoordinate(stationId: number): Promise<[number, number]> {
@@ -34,10 +36,11 @@ async function retrieveStationCoordinate(stationId: number): Promise<[number, nu
         `;
     const db = await open();
     try {
-        const [result] = await db.executeSql(command, [stationId]);
-        if (result.rows.length > 0) {
-            const row = result.rows.item(0);
-            return [row.latitude, row.longitude];
+        const [response] = await db.executeSql(command, [stationId]);
+        const result = response.rows;
+        if (result.length > 0) {
+            const coordinate = result.item(0);
+            return [coordinate.latitude, coordinate.longitude];
         } else {
             throw new Error(`Station with ID ${stationId} not found.`);
         }
@@ -55,6 +58,27 @@ async function open(): Promise<SQLite.SQLiteDatabase> {
         return db;
     } catch (error) {
         console.error('Error opening database:', error);
+        throw error;
+    }
+}
+
+async function retrieveNaptanId(stationId: number): Promise<string> {
+    const command = `
+        SELECT naptanId
+        FROM stations
+        WHERE stationId = ?;
+    `;
+    const db = await open();
+    try {
+        const [response] = await db.executeSql(command, [stationId]);
+        const result = response.rows;
+        if (result.length > 0) {
+            return result.item(0).naptanId;
+        } else {
+            throw new Error(`Station with ID ${stationId} not found.`);
+        }
+    } catch (error) {
+        console.error('Error retrieving Naptan ID:', error);
         throw error;
     }
 }
@@ -80,10 +104,10 @@ async function retrieveStationName(stationId: number): Promise<string> {
         `;
     const db = await open();
     try {
-        const [result] = await db.executeSql(command, [stationId]);
-        if (result.rows.length > 0) {
-            const row = result.rows.item(0);
-            return row.stationName;
+        const [response] = await db.executeSql(command, [stationId]);
+        const result = response.rows;
+        if (result.length > 0) {
+            return result.item(0).stationName;
         } else {
             throw new Error(`Station with ID ${stationId} not found.`);
         }
@@ -104,10 +128,11 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<{ toS
 
     const db = await open();
     try {
-        const [result] = await db.executeSql(command, [stationId]);
+        const [response] = await db.executeSql(command, [stationId]);
+        const result = response.rows;
         const stations: Array<{ toStationId: number; lineId: number; travelTime: number }> = [];
-        for (let i = 0; i < result.rows.length; i++) {
-            const row = result.rows.item(i);
+        for (let i = 0; i < result.length; i++) {
+            const row = result.item(i);
             stations.push({ toStationId: row.toStationId, lineId: row.lineId, travelTime: row.travelTime });
         }
         return stations;
@@ -186,10 +211,11 @@ async function retrieveStationsByName(searchTerm: string): Promise<Array<{ stati
 
     const db = await open();
     try {
-        const [result] = await db.executeSql(command, [`${searchTerm}%`]);
+        const [response] = await db.executeSql(command, [`${searchTerm}%`]);
+        const result = response.rows;
         const stations: Array<{ stationId: number; stationName: string }> = [];
-        for (let i = 0; i < result.rows.length; i++) {
-            const row = result.rows.item(i);
+        for (let i = 0; i < result.length; i++) {
+            const row = result.item(i);
             stations.push({ stationId: row.stationId, stationName: row.stationName });
         }
         return stations;

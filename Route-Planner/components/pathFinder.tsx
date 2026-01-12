@@ -158,13 +158,14 @@ export async function retrieveOptimalRoute(fromStationId: number, toStationId: n
 }
 
 export function getCachedPath(): PathFinderResult | null {
+    if (cachedPath === null) {
+        console.warn('No cached path available.');
+        return null;
+    }
     return cachedPath;
 }
 
-export async function retrievePathByStationId(fromStationId: number, toStationId: number): Promise<Array<number>> {
-    const result = await retrieveOptimalRoute(fromStationId, toStationId);
-    return result.shortestPathStations;
-}
+
 async function formatPathAsNames(path: Array<number>): Promise<Array<string>> {
     const stationNames: Array<string> = [];
     for (const stationId of path) {
@@ -181,23 +182,28 @@ async function formatLinesAsNames(path: Array<number>): Promise<Array<string>> {
     }
     return lineNames;
 }
-export async function retrievePathByName(fromStationId: number, toStationId: number): Promise<Array<string>> {
-    const result = await retrieveOptimalRoute(fromStationId, toStationId);
-    return formatPathAsNames(result.shortestPathStations);
-}
-export async function retrievePathLine(fromStationId: number, toStationId: number): Promise<Array<number>> {
-    const result = await retrieveOptimalRoute(fromStationId, toStationId);
-    return result.shortestPathLines;
-}
-export async function retrieveShortestTime(fromStationId: number, toStationId: number): Promise<number> {
-    const result = await retrieveOptimalRoute(fromStationId, toStationId);
-    return result.totalTime;
-}
-export async function retrieveDiagnosticInfo(fromStationId: number, toStationId: number): Promise<{ stationLinePairsEvaluated: number; stationLinePairsInQueue: number }> {
-    const result = await retrieveOptimalRoute(fromStationId, toStationId);
-    return {
-        stationLinePairsEvaluated: result.stationLinePairsEvaluated,
-        stationLinePairsInQueue: result.stationLinePairsInQueue
-    };
-}
+
+// export async function retrievePathByStationId(fromStationId: number, toStationId: number): Promise<Array<number>> {
+//     const result = await retrieveOptimalRoute(fromStationId, toStationId);
+//     return result.shortestPathStations;
+// }
+// export async function retrievePathByName(fromStationId: number, toStationId: number): Promise<Array<string>> {
+//     const result = await retrieveOptimalRoute(fromStationId, toStationId);
+//     return formatPathAsNames(result.shortestPathStations);
+// }
+// export async function retrievePathLine(fromStationId: number, toStationId: number): Promise<Array<number>> {
+//     const result = await retrieveOptimalRoute(fromStationId, toStationId);
+//     return result.shortestPathLines;
+// }
+// export async function retrieveShortestTime(fromStationId: number, toStationId: number): Promise<number> {
+//     const result = await retrieveOptimalRoute(fromStationId, toStationId);
+//     return result.totalTime;
+// }
+// export async function retrieveDiagnosticInfo(fromStationId: number, toStationId: number): Promise<{ stationLinePairsEvaluated: number; stationLinePairsInQueue: number }> {
+//     const result = await retrieveOptimalRoute(fromStationId, toStationId);
+//     return {
+//         stationLinePairsEvaluated: result.stationLinePairsEvaluated,
+//         stationLinePairsInQueue: result.stationLinePairsInQueue
+//     };
+// }
 
