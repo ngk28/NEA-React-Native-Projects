@@ -39,6 +39,12 @@ export default function TabLayout() {
             title: 'Disruptions',
           }}
         />
+        <Tabs.Screen
+          name="recent"
+          options={{
+            title: 'Recent',
+          }}
+        />
       </Tabs>
     </RouteProvider>
   );

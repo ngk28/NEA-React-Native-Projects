@@ -2,12 +2,12 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { disruption, retrieveDisruptions } from '@/components/disruptionAPI';
+import { disruptionEvent, retrieveDisruptions } from '@/components/disruptionAPI';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
 export default function DisruptionScreen() {
-  const [disruptions, setDisruptions] = useState<disruption[]>([]);
+  const [disruptions, setDisruptions] = useState<disruptionEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
@@ -36,7 +36,7 @@ export default function DisruptionScreen() {
     };
   }, []);
 
-  const renderItem = ({ item }: { item: disruption }) => (
+  const renderDisruption = ({ item }: { item: disruptionEvent }) => (
     <ThemedView style={styles.card}>
       <ThemedText type="title" style={styles.lineName}>{item.lineName}</ThemedText>
       <ThemedText type="default">Status: {item.status}</ThemedText>
@@ -54,8 +54,8 @@ export default function DisruptionScreen() {
       )}
       <FlatList
         data={disruptions}
-        keyExtractor={(item) => item.lineName}
-        renderItem={renderItem}
+        keyExtractor={(disruption) => disruption.lineName}
+        renderItem={renderDisruption}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDisruptions} />}
         contentContainerStyle={styles.listContent}
       />

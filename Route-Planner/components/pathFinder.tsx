@@ -1,8 +1,8 @@
 import { Database } from '@/components/database';
 
 export type PathFinderResult = {
-    shortestPathStations: number[];
-    shortestPathLines: number[];
+    optimalStationSequence: number[];
+    optimizedLineSequence: number[];
     totalTime: number;
     stationLinePairsEvaluated: number;
     stationLinePairsInQueue: number;
@@ -43,8 +43,8 @@ function reconstructPath(previous: Map<string, string | null>, stationLineKey: s
 }
 
 async function computeShortestPath(fromStationId: number, toStationId: number): Promise<PathFinderResult> {
-    const visited = new Set<string>(); // Track stationId-lineId pairs
-    const previous = new Map<string, string | null>(); // Track stationId-lineId pairs
+    const visitedNodes = new Set<string>(); // Track stationId-lineId pairs
+    const previousNodeMap = new Map<string, string | null>(); // Track stationId-lineId pairs
     const optimalTime = new Map<string, number>(); // Key: stationId-lineId, Value: optimal time to reach station via specific line
     const [toStationLatitude, toStationLongitude] = await Database.retrieveStationCoordinate(toStationId);
     const [fromStationLatitude, fromStationLongitude] = await Database.retrieveStationCoordinate(fromStationId);
@@ -55,7 +55,7 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
     var estimatedCost = HaversineDistance(fromStationLatitude, fromStationLongitude, toStationLatitude, toStationLongitude);
     // Initialize start state being from any line
     const startStateKey = `${fromStationId}-null`;
-    previous.set(startStateKey, null);
+    previousNodeMap.set(startStateKey, null);
     // Time from start to start is 0
     optimalTime.set(startStateKey, 0);
     // LineId = null means journey can start from any line without time punishment 
@@ -70,20 +70,20 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
         const currentStationLineKey = `${current.stationId}-${current.lineId}`;
 
         // Skip if already processed this exact station-line combination
-        if (visited.has(currentStationLineKey)) {
+        if (visitedNodes.has(currentStationLineKey)) {
             continue;
         }
-        visited.add(currentStationLineKey);
+        visitedNodes.add(currentStationLineKey);
 
         // Optimal path found and exit
         if (current.stationId === toStationId) {
-            const stationLinePairsEvaluated = visited.size;
+            const stationLinePairsEvaluated = visitedNodes.size;
             const stationLinePairsInQueue = queue.length;
-            const shortestPath = reconstructPath(previous, currentStationLineKey);
+            const shortestPath = reconstructPath(previousNodeMap, currentStationLineKey);
             const shortestPathStations = shortestPath.stationPath;
             const shortestPathLines = shortestPath.linePath;
             const totalTime = optimalTime.get(currentStationLineKey)!;
-            return { shortestPathStations, shortestPathLines, totalTime, stationLinePairsEvaluated, stationLinePairsInQueue };
+            return { optimalStationSequence: shortestPathStations, optimizedLineSequence: shortestPathLines, totalTime, stationLinePairsEvaluated, stationLinePairsInQueue };
         }
 
         const neighbours = await Database.retrieveNeighbourStations(current.stationId);
@@ -91,7 +91,7 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
         for (const neighbour of neighbours) {
             // Skip if already visited this specific station-line combination
             const neighbourStationLineKey = `${neighbour.toStationId}-${neighbour.lineId}`;
-            if (visited.has(neighbourStationLineKey)) {
+            if (visitedNodes.has(neighbourStationLineKey)) {
                 continue;
             }
 
@@ -121,52 +121,83 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
             if (queueStationLineIndex === -1) {
                 queue.push({ stationId: neighbour.toStationId, estimatedTime: newEstimatedTime, lineId: neighbour.lineId });
                 optimalTime.set(neighbourStationLineKey, tentativeTime);
-                previous.set(neighbourStationLineKey, currentStationLineKey);
+                previousNodeMap.set(neighbourStationLineKey, currentStationLineKey);
             }
             // If path exists in queue but new path is better, update it
             else if (tentativeTime < (optimalTime.get(neighbourStationLineKey) || Infinity)) {
                 optimalTime.set(neighbourStationLineKey, tentativeTime);
-                previous.set(neighbourStationLineKey, currentStationLineKey);
+                previousNodeMap.set(neighbourStationLineKey, currentStationLineKey);
                 queue[queueStationLineIndex].estimatedTime = newEstimatedTime;
             }
         }
     }
-    return { shortestPathStations: [], shortestPathLines: [], totalTime: Infinity, stationLinePairsEvaluated: 0, stationLinePairsInQueue: 0 };
+    return { optimalStationSequence: [], optimizedLineSequence: [], totalTime: Infinity, stationLinePairsEvaluated: 0, stationLinePairsInQueue: 0 };
 }
 
 // Store the most recently calculated path for quick access
 let cachedPath: PathFinderResult | null = null;
-let cachedPathKey: string | null = null;
+let cachedPathKey: pathKey | null = null;
+let cachedPathStationDetails: Array<station> | null = null;
 
-export async function retrieveOptimalRoute(fromStationId: number, toStationId: number): Promise<PathFinderResult> {
-    const pathKey = `${fromStationId}-${toStationId}`;
-    if (cachedPath !== null && cachedPathKey === pathKey) return cachedPath;
-    const result = await computeShortestPath(fromStationId, toStationId);
-    cachedPath = result;
-    cachedPathKey = pathKey;
-
-    // Diagnostic logs
-    console.log('From station ID:', fromStationId, 'To station ID:', toStationId);
-    console.log('Station-line pairs visited:', result.stationLinePairsEvaluated);
-    console.log('Station-line pairs in queue:', result.stationLinePairsInQueue);
-    console.log('Shortest path (stations):', result.shortestPathStations, 'Total time:', result.totalTime);
-    console.log('Shortest path (names):', await formatPathAsNames(result.shortestPathStations));
-    console.log('Shortest path (lines):', result.shortestPathLines);
-    console.log('Shortest path (line names):', await formatLinesAsNames(result.shortestPathLines));
-
-    return result;
+export type pathKey = {
+    fromStationId: number;
+    toStationId: number;
 }
 
-export function getCachedPath(): PathFinderResult | null {
-    if (cachedPath === null) {
-        console.warn('No cached path available.');
-        return null;
+export async function retrieveOptimalRoute(fromStationId: number, toStationId: number): Promise<PathFinderResult> {
+    const routePathKey: pathKey = {
+        fromStationId: fromStationId,
+        toStationId: toStationId
+    };
+    if (cachedPath !== null && cachedPathKey !== null && cachedPathKey === routePathKey) {
+        return getCachedPath();
+    }
+    const shortestPath = await computeShortestPath(fromStationId, toStationId);
+    cachedPath = shortestPath;
+    const generatedStationDetails = await generateStationLineList();
+    cachedPathStationDetails = generatedStationDetails;
+    cachedPathKey = routePathKey;
+
+    // Diagnostic logs
+    // console.log('From station ID:', fromStationId, 'To station ID:', toStationId);
+    // console.log('Station-line pairs visited:', result.stationLinePairsEvaluated);
+    // console.log('Station-line pairs in queue:', result.stationLinePairsInQueue);
+    // console.log('Shortest path (stations):', result.optimalStationSequence, 'Total time:', result.totalTime);
+    console.log('Shortest path (names):', await formatStationAsNames(shortestPath.optimalStationSequence));
+    // console.log('Shortest path (lines):', result.optimizedLineSequence);
+    console.log('Shortest path (line names):', await formatLinesAsNames(shortestPath.optimizedLineSequence));
+
+    return shortestPath;
+}
+
+// get cached path without recomputation, catches null error (for all functions calling it) if no cached path
+function getCachedPath(): PathFinderResult {
+    try {
+        if (cachedPath === null) {
+            console.warn('No cached path available.');
+            throw new Error('No cached path available.');
+        }
+    } catch (error) {
+        console.error('Error retrieving cached path:', error);
+        throw error;
     }
     return cachedPath;
 }
 
+function getCachedPathStationDetails(): Array<station> {
+    try {
+        if (cachedPathStationDetails === null) {
+            console.warn('No cached path station details available.');
+            throw new Error('No cached path station details available.');
+        }
+    } catch (error) {
+        console.error('Error retrieving cached path station details:', error);
+        throw error;
+    }
+    return cachedPathStationDetails;
+}
 
-async function formatPathAsNames(path: Array<number>): Promise<Array<string>> {
+async function formatStationAsNames(path: Array<number>): Promise<Array<string>> {
     const stationNames: Array<string> = [];
     for (const stationId of path) {
         const stationName = await Database.retrieveStationName(stationId);
@@ -182,6 +213,84 @@ async function formatLinesAsNames(path: Array<number>): Promise<Array<string>> {
     }
     return lineNames;
 }
+
+// Outputs name so easier to display in UI
+export type station = {
+    stationId: number;
+    stationName: string;
+    fromLineName?: string | null;
+    toLineName?: string | null;
+};
+export async function generateStationLineList(): Promise<Array<station>> {
+    const route = getCachedPath();
+    const routePathKey: pathKey = {
+        fromStationId: route.optimalStationSequence[0],
+        toStationId: route.optimalStationSequence[route.optimalStationSequence.length - 1]
+    };
+    if (cachedPathStationDetails !== null && cachedPathKey !== null && cachedPathKey === routePathKey) {
+        return getCachedPathStationDetails();
+    }
+    const stationSequence = route.optimalStationSequence;
+    const stationNames = await formatStationAsNames(stationSequence);
+    const lineSequence = route.optimizedLineSequence;
+
+    const stationOnPathDetails: Array<station> = [];
+    // detect transfer stations including start and end
+    try {
+        for (let i = 0; i < stationSequence.length; i++) {
+            if (i === 0) { // start station
+                const toLineId = lineSequence[0];
+                const toLineName = await Database.retrieveLineName(toLineId);
+                const startStation = {
+                    stationId: stationSequence[i],
+                    stationName: stationNames[i],
+                    fromLineName: null,
+                    toLineName: toLineName
+                }
+                stationOnPathDetails.push(startStation);
+                continue;
+            } else if (i === stationSequence.length - 1) { // end station
+                const fromLineId = lineSequence[lineSequence.length - 1];
+                const fromLineName = await Database.retrieveLineName(fromLineId);
+                const endStation = {
+                    stationId: stationSequence[i],
+                    stationName: stationNames[i],
+                    fromLineName: fromLineName,
+                    toLineName: null
+                }
+                stationOnPathDetails.push(endStation);
+                continue;
+            } else { // intermediate stations
+                const previousLine = lineSequence[i - 1];
+                const nextLine = lineSequence[i];
+                const fromLineName = await Database.retrieveLineName(previousLine);
+                const toLineName = await Database.retrieveLineName(nextLine);
+                const station = {
+                    stationId: stationSequence[i],
+                    stationName: stationNames[i],
+                    fromLineName: fromLineName,
+                    toLineName: toLineName
+                };
+                stationOnPathDetails.push(station);
+            }
+        }
+    } catch (error) {
+        console.error('Error generating station list:', error);
+    }
+    cachedPathStationDetails = stationOnPathDetails;
+    return stationOnPathDetails;
+}
+
+
+export async function generateTransferStationList(): Promise<Array<station>> {
+    if (cachedPathStationDetails !== null) {
+        return getCachedPathStationDetails().filter((station) => station.fromLineName !== station.toLineName);
+    }
+    const stationDetails = await generateStationLineList();
+    const transferStations = stationDetails.filter((station) => station.fromLineName !== station.toLineName);
+    return transferStations;
+}
+
 
 // export async function retrievePathByStationId(fromStationId: number, toStationId: number): Promise<Array<number>> {
 //     const result = await retrieveOptimalRoute(fromStationId, toStationId);

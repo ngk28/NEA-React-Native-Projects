@@ -40,7 +40,7 @@ async function retrieveStationCoordinate(stationId: number): Promise<[number, nu
         const result = response.rows;
         if (result.length > 0) {
             const coordinate = result.item(0);
-            return [coordinate.latitude, coordinate.longitude];
+            return [coordinate.longitude, coordinate.latitude];
         } else {
             throw new Error(`Station with ID ${stationId} not found.`);
         }

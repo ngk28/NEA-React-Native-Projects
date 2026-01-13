@@ -1,21 +1,15 @@
+import { buildRouteFeatureCollection } from '@/components/jsonManager';
+import { generateStationCoords, stationCoords } from '@/components/markers';
+import { generateStationLineList, generateTransferStationList, station } from '@/components/pathFinder';
 import { useRoute } from '@/contexts/RouteContext';
 import Mapbox from "@rnmapbox/maps";
 import React, { useEffect, useRef, useState } from 'react';
-import { buildRouteFeatureCollection } from '@/components/jsonManager';
-import { Database } from '@/components/database';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const accessToken = "pk.eyJ1Ijoiam4xMzI0IiwiYSI6ImNtZ2txMGg5bzB0c3oyanNneHk2NzhiM2YifQ.Y9SOFJzcEKXBcp5vWZ4-og";
 
 Mapbox.setAccessToken(accessToken);
 Mapbox.setTelemetryEnabled(false);
-
-type station = {
-    stationId: number;
-    stationName: string;
-    fromLineName?: string | null;
-    toLineName?: string | null;
-};
 
 export default function MapScreen() {
     const { route } = useRoute();
@@ -24,6 +18,7 @@ export default function MapScreen() {
 
     const [stationDetails, setStationDetails] = useState<Array<station>>([]);
     const [transferStations, setTransferStations] = useState<Array<station>>([]);
+    const [stationCoords, setStationCoords] = useState<Array<stationCoords>>([]);
     const [popupVisible, setPopupVisible] = useState(false);
     const [expanded, setExpanded] = useState(false);
 
@@ -31,54 +26,23 @@ export default function MapScreen() {
         try {
             const featureCollection = await buildRouteFeatureCollection(route!);
             setRouteGeoJSON(featureCollection);
-            // Build popup data (station names, transfers)
-            buildPopupData(route);
             setPopupVisible(true);
         } catch (err) {
             console.error('Failed to build route geometry:', err);
-            setRouteGeoJSON(null);
             setPopupVisible(false);
         }
     }
 
-    async function buildPopupData(route: any) {
+    async function buildPopupData() {
         try {
-            const stationNames = await Promise.all(route.stations.map((id: number) => Database.retrieveStationName(id)));
-            const details = route.stations.map((stationId: number, idx: number) => ({ stationId, stationName: stationNames[idx] }));
-            setStationDetails(details);
-
-            // detect transfer stations (include start and end)
-            const transfers: Array<{ stationId: number; stationName: string; fromLineName?: string | null; toLineName?: string | null }> = [];
-            const lines: number[] = route.lines || [];
-            for (let i = 0; i < details.length; i++) {
-                // start
-                if (i === 0) {
-                    const toLineId = lines[0];
-                    const toLineName = toLineId != null ? await Database.retrieveLineName(toLineId) : null;
-                    transfers.push({ stationId: details[i].stationId, stationName: details[i].stationName, fromLineName: null, toLineName: toLineName });
-                    continue;
-                }
-                // end
-                if (i === details.length - 1) {
-                    const fromLineId = lines[lines.length - 1];
-                    const fromLineName = fromLineId != null ? await Database.retrieveLineName(fromLineId) : null;
-                    transfers.push({ stationId: details[i].stationId, stationName: details[i].stationName, fromLineName: fromLineName, toLineName: null });
-                    continue;
-                }
-                // intermediate - check if line changes between segments i-1 and i
-                const prevLine = lines[i - 1];
-                const nextLine = lines[i];
-                if (prevLine !== nextLine) {
-                    const fromLineName = prevLine != null ? await Database.retrieveLineName(prevLine) : null;
-                    const toLineName = nextLine != null ? await Database.retrieveLineName(nextLine) : null;
-                    transfers.push({ stationId: details[i].stationId, stationName: details[i].stationName, fromLineName, toLineName });
-                }
-            }
-            setTransferStations(transfers);
+            const stationDetail = await generateStationLineList();
+            setStationDetails(stationDetail);
+            const transferStations = await generateTransferStationList();
+            setTransferStations(transferStations);
+            const stationCoords = await generateStationCoords();
+            setStationCoords(stationCoords);
         } catch (err) {
             console.error('Failed to build popup data:', err);
-            setStationDetails([]);
-            setTransferStations([]);
         }
     }
 
@@ -109,9 +73,13 @@ export default function MapScreen() {
     }
 
     useEffect(() => {
-        if (route) {
-            loadRouteGeometry();
+        if (!route) {
+            setRouteGeoJSON(null);
+            setPopupVisible(false);
+            return;
         }
+        loadRouteGeometry();
+        buildPopupData();
     }, [route]);
 
     // After geometry is loaded, adjust camera to fit the route
@@ -134,9 +102,10 @@ export default function MapScreen() {
                     centerCoordinate={[-0.1276, 51.5074]} // Centre of London coordinates
                 />
 
-                {/* Displays route onto map */}
+
                 {routeGeoJSON && routeGeoJSON.features.length > 0 && (
                     <>
+                        {/* Displays route onto map */}
                         {routeGeoJSON.features.map((feature, index) => (
                             <Mapbox.ShapeSource key={`route-${index}`} id={`route-${index}`} shape={feature}>
                                 <Mapbox.LineLayer
@@ -149,6 +118,25 @@ export default function MapScreen() {
                                 />
                             </Mapbox.ShapeSource>
                         ))}
+
+                        {/* Station markers */}
+                        {stationDetails.map((station, index) => {
+                            const stationCoord = stationCoords.find(coord => coord.stationId === station.stationId);
+                            if (!stationCoord) return null;
+                            const isStart = (index === 0);
+                            const isEnd = (index === stationDetails.length - 1);
+                            const isTransfer = (transferStations.some(transferStation => transferStation.stationId === station.stationId));
+
+                            let markerStyle = styles.intermediateMarker;
+                            if (isStart) markerStyle = styles.startMarker;
+                            else if (isEnd) markerStyle = styles.endMarker;
+                            else if (isTransfer) markerStyle = styles.transferMarker;
+                            return (
+                                <Mapbox.PointAnnotation key={`marker-${station.stationId}`} id={`marker-${station.stationId}`} coordinate={stationCoord.coordinates}>
+                                    <View style={markerStyle} />
+                                </Mapbox.PointAnnotation>
+                            );
+                        })}
                     </>
                 )}
             </Mapbox.MapView>
@@ -168,10 +156,10 @@ export default function MapScreen() {
                         )}
 
                         <View style={styles.transfersList}>
-                            {transferStations.map((t) => (
-                                <View key={`transfer-${t.stationId}`} style={styles.transferItem}>
-                                    <Text style={styles.transferName}>{t.stationName}</Text>
-                                    <Text style={styles.transferLines}>{t.toLineName}</Text>
+                            {transferStations.map((transferStation) => (
+                                <View style={styles.transferItem} key={`transfer-${transferStation.stationId}`}>
+                                    <Text style={styles.transferName}>{transferStation.stationName}</Text>
+                                    <Text style={styles.transferLines}>{transferStation.toLineName}</Text>
                                 </View>
                             ))}
                         </View>
@@ -187,15 +175,23 @@ export default function MapScreen() {
 
                         {expanded && (
                             <ScrollView style={styles.expandedList}>
-                                {stationDetails.map((s, idx) => (
-                                    <View key={`station-${s.stationId}-${idx}`} style={styles.expandedItem}>
-                                        <Text style={styles.expandedIndex}>{idx + 1}.</Text>
-                                        <Text style={styles.expandedName}>{s.stationName}</Text>
-                                        <Text style={styles.expandedLine}>{route.lines && route.lines[idx] ? ` (${route.lines[idx]})` : ''}</Text>
+                                {stationDetails.map((station, indexNumber) => (
+                                    <View key={`station-${station.stationId}-${indexNumber}`} style={styles.expandedItem}>
+                                        <Text style={styles.expandedIndex}>{indexNumber + 1}.</Text>
+                                        <Text style={styles.expandedName}>{station.stationName}</Text>
+                                        <Text style={styles.expandedLine}>{station.fromLineName === null ? `${station.toLineName}` : ''}</Text>
+                                        <Text style={styles.expandedLine}>{(station.fromLineName !== station.toLineName) && (station.fromLineName !== null) && (station.toLineName !== null) ? `${station.fromLineName} → ${station.toLineName}` : ''}</Text>
+                                        <Text style={styles.expandedLine}>{station.toLineName === null ? `${station.fromLineName}` : ''}</Text>
                                     </View>
                                 ))}
                             </ScrollView>
                         )}
+
+                        {/* expanded show disruption if necessary */}
+
+
+
+
                     </View>
                 </View>
             )}
@@ -300,5 +296,39 @@ const styles = StyleSheet.create({
     expandedLine: {
         color: '#666',
         marginLeft: 6,
+    },
+    startMarker: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: '#0a84ff',
+        borderWidth: 2,
+        borderColor: '#fff',
+        opacity: 0.95,
+    },
+    endMarker: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        backgroundColor: '#ff3b30',
+        borderWidth: 2,
+        borderColor: '#fff',
+        opacity: 0.95,
+    },
+    transferMarker: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#ffcc00',
+        opacity: 0.95,
+        borderWidth: 1,
+        borderColor: '#fff',
+    },
+    intermediateMarker: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#000',
+        opacity: 0.45,
     },
 });

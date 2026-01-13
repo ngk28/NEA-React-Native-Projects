@@ -1,12 +1,13 @@
-import { Button, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { Database } from '@/components/database';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { getCachedPath, retrieveOptimalRoute } from '@/components/pathFinder';
+import { retrieveOptimalRoute } from '@/components/pathFinder';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRoute } from '@/contexts/RouteContext';
 import * as React from 'react';
+import { ScrollView } from 'react-native';
 
 type station = {
   stationId: number;
@@ -23,7 +24,7 @@ export default function TabTwoScreen() {
   const [destMatches, setDestMatches] = React.useState<Array<{ stationId: number; stationName: string }>>([]);
   // Confirmed station selection by user
   const [selectedStart, setSelectedStart] = React.useState<{ stationId: number; stationName: string } | null>(null);
-  const [selectedDest, setSelectedDest] = React.useState<{ stationId: number; stationName: string } | null>(null);
+  const [selectedDestination, setSelectedDest] = React.useState<{ stationId: number; stationName: string } | null>(null);
   // React Native loading states
   const [loadingStart, setLoadingStart] = React.useState(false);
   const [loadingDest, setLoadingDest] = React.useState(false);
@@ -57,36 +58,36 @@ export default function TabTwoScreen() {
   }, [destQuery]);
 
 
-  const handleSelectStart = (startStation: station) => {
+  const onStartStationSelect = (startStation: station) => {
     setSelectedStart(startStation);
     setStartQuery(startStation.stationName);
     setStartMatches([]);
   };
 
-  const handleSelectDest = (destinationStation: station) => {
+  const onDestStationSelect = (destinationStation: station) => {
     setSelectedDest(destinationStation);
     setDestQuery(destinationStation.stationName);
     setDestMatches([]);
   };
 
   const handleFindPath = async () => {
-    if (!selectedStart || !selectedDest) {
+    if (!selectedStart || !selectedDestination) {
       console.warn('Pick both stations before searching.');
       return;
     }
 
-    console.log('Finding path from', selectedStart.stationName, 'to', selectedDest.stationName);
+    console.log('Finding path from', selectedStart.stationName, 'to', selectedDestination.stationName);
     try {
-      const optimalRoute = await retrieveOptimalRoute(selectedStart.stationId, selectedDest.stationId);
+      const optimalRoute = await retrieveOptimalRoute(selectedStart.stationId, selectedDestination.stationId);
       const cached = optimalRoute;
       if (cached) {
         setShortestTime(cached.totalTime);
-        setShortestPath(cached.shortestPathStations);
+        setShortestPath(cached.optimalStationSequence);
         setPathFound(true);
         // Share route with map tab
         setRoute({
-          stations: cached.shortestPathStations,
-          lines: cached.shortestPathLines,
+          stations: cached.optimalStationSequence,
+          lines: cached.optimizedLineSequence,
           totalTime: cached.totalTime,
         });
         console.log('Optimal route found:', cached);
@@ -123,24 +124,20 @@ export default function TabTwoScreen() {
           placeholder='Starting station'
           autoCorrect={false}
         />
-
         {loadingStart && <Text style={styles.helper}>Searching…</Text>}
         {!loadingStart && selectedStart && <Text style={styles.helper}>Selected: {selectedStart.stationName}</Text>}
-
         {selectedStart === null && (
-          <FlatList
-            data={startMatches}
-            keyExtractor={(station) => String(station.stationId)}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.listItem} onPress={() => handleSelectStart(item)}>
-                <Text>{item.stationName}</Text>
-              </TouchableOpacity>
+          <ScrollView style={styles.suggestions}>
+            {startMatches.length > 0 ? (
+              startMatches.map((station) => (
+                <TouchableOpacity style={styles.listItem} key={String(station.stationId)} onPress={() => onStartStationSelect(station)}>
+                  <Text>{station.stationName}</Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              startQuery.trim().length >= 2 && !loadingStart ? <Text style={styles.helper}>No matches</Text> : null
             )}
-            ListEmptyComponent={
-              startQuery.trim().length >= 2 && !loadingStart ?
-                <Text style={styles.helper}>No matches</Text> : null
-            }
-          />
+          </ScrollView>
         )}
       </View>
 
@@ -155,21 +152,20 @@ export default function TabTwoScreen() {
           placeholder='Destination station'
           autoCorrect={false}
         />
-
         {loadingDest && <Text style={styles.helper}>Searching…</Text>}
-        {!loadingDest && selectedDest && <Text style={styles.helper}>Selected: {selectedDest.stationName}</Text>}
-
-        {selectedDest === null && (
-          <FlatList
-            data={destMatches}
-            keyExtractor={(item) => String(item.stationId)}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.listItem} onPress={() => handleSelectDest(item)}>
-                <Text>{item.stationName}</Text>
-              </TouchableOpacity>
+        {!loadingDest && selectedDestination && <Text style={styles.helper}>Selected: {selectedDestination.stationName}</Text>}
+        {selectedDestination === null && (
+          <ScrollView style={styles.suggestions}>
+            {destMatches.length > 0 ? (
+              destMatches.map((item) => (
+                <TouchableOpacity key={String(item.stationId)} style={styles.listItem} onPress={() => onDestStationSelect(item)}>
+                  <Text>{item.stationName}</Text>
+                </TouchableOpacity>
+              ))
+            ) : (
+              destQuery.trim().length >= 2 && selectedDestination === null && !loadingDest ? <Text style={styles.helper}>No matches</Text> : null
             )}
-            ListEmptyComponent={destQuery.trim().length >= 2 && selectedDest === null && !loadingDest ? <Text style={styles.helper}>No matches</Text> : null}
-          />
+          </ScrollView>
         )}
       </View>
 
@@ -211,6 +207,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#ddd',
+  },
+  suggestions: {
+    maxHeight: 160,
   },
   helper: {
     color: '#666',

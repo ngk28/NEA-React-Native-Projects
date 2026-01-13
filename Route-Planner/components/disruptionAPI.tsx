@@ -1,4 +1,3 @@
-import React, { useEffect, useState } from 'react';
 // https://api-portal.tfl.gov.uk/api-details#api=Line&operation=Line_StatusByModeByPathModesQueryDetailQuerySeverityLevel
 
 
@@ -20,19 +19,19 @@ async function queryDisruptionAPI() {
         throw error;
     }
 }
-export type disruption = {
+export type disruptionEvent = {
     lineName: string;
     status: string;
     severity: number;
     reason: string;
 };
-async function parseRetrievedDisruptions(data: any[]): Promise<Array<disruption>> {
+async function parseRetrievedDisruptions(data: any[]): Promise<Array<disruptionEvent>> {
     if (!data) {
         console.log('No disruption data available.');
         return [];
     }
     try {
-        const disruptions: Array<disruption> = data.map((item: any) => ({
+        const disruptions: Array<disruptionEvent> = data.map((item: any) => ({
             lineName: item.name,
             status: item.lineStatuses[0].statusSeverityDescription || 'Unknown',
             severity: item.lineStatuses[0].statusSeverity || 0,
