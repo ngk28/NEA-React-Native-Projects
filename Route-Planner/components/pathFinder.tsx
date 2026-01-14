@@ -2,14 +2,8 @@ import { Database } from '@/components/database';
 import { cache } from 'react';
 import { fetchDisruptionTimeForLine } from '@/components/disruptionAPI';
 import { useRoute } from '@/contexts/RouteContext';
+import { pathFinderResult } from '@/components/types';
 
-export type pathFinderResult = {
-    optimalStationSequence: number[];
-    optimizedLineSequence: number[];
-    totalTime: number;
-    stationLinePairsEvaluated: number;
-    stationLinePairsInQueue: number;
-};
 
 // Converts latitude and longitude to distance in kilometres using the Haversine formula
 function HaversineDistance(latitude1: number, longitude1: number, latitude2: number, longitude2: number): number {

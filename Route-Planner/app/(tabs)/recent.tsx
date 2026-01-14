@@ -2,13 +2,17 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { retrieveSearchHistory, searchHistoryEntry, cleanUpSearchHistory, deleteSearchHistory } from '@/components/searchHistoryManager';
 import * as React from 'react';
 import { useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useRoute } from '@/contexts/RouteContext';
+import { pathKey } from '@/components/types';
+
 
 export default function RecentScreen() {
     const [recentSearches, setRecentSearches] = React.useState<Array<searchHistoryEntry>>([]);
-    const { route } = useRoute();
+    const { setPath, route } = useRoute();
+    const router = useRouter();
 
     const fetchRecentSearches = async () => {
         try {
@@ -25,7 +29,16 @@ export default function RecentScreen() {
     }, [route]);
 
     const handleSearchAgain = (search: searchHistoryEntry) => {
-        console.log('Searching again for:', search);
+        // Share selected path to search page
+        const selectedPath: pathKey = {
+            fromStationId: search.fromStationId,
+            toStationId: search.toStationId,
+            fromStationName: search.fromStationName,
+            toStationName: search.toStationName,
+        };
+        setPath(selectedPath);
+        // Navigate back to the Search tab (index)
+        router.push('/');
     }
 
     const clearHistory = async () => {

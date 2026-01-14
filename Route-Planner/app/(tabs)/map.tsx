@@ -5,7 +5,6 @@ import Mapbox from "@rnmapbox/maps";
 import React, { useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-
 const accessToken = "pk.eyJ1Ijoiam4xMzI0IiwiYSI6ImNtZ2txMGg5bzB0c3oyanNneHk2NzhiM2YifQ.Y9SOFJzcEKXBcp5vWZ4-og";
 
 Mapbox.setAccessToken(accessToken);
@@ -63,8 +62,8 @@ export default function MapScreen() {
         const minLatitude = Math.min(...latitudes);
         const maxLatitude = Math.max(...latitudes);
         cameraRef.current.fitBounds(
-            [minLongitude, minLatitude],
-            [maxLongitude, maxLatitude],
+            [minLongitude, minLatitude - 0.02],
+            [maxLongitude, maxLatitude - 0.02],
             10, // Padding
             1000 // Animation duration in ms
         );

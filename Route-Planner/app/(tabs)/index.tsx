@@ -1,5 +1,4 @@
 import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
 import { Database } from '@/components/database';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { retrieveOptimalRoute } from '@/components/pathFinder';
@@ -10,22 +9,21 @@ import * as React from 'react';
 import { ScrollView } from 'react-native';
 import { retrieveDisruptions } from '@/components/disruptionAPI';
 import { logSearchHistory } from '@/components/searchHistoryManager';
-type station = {
-  stationId: number;
-  stationName: string;
-};
+import { station } from '@/components/types';
+import { useRouter } from 'expo-router';
 
-export default function TabTwoScreen() {
-  const { setRoute } = useRoute();
+export default function Search() {
+  const { setRoute, path: selectedPath, setPath } = useRoute();
+  const router = useRouter();
   // Process
   const [startQuery, setStartQuery] = React.useState('');
   const [destQuery, setDestQuery] = React.useState('');
   // Search results given a text input - station not confirmed by user yet
-  const [startMatches, setStartMatches] = React.useState<Array<{ stationId: number; stationName: string }>>([]);
-  const [destMatches, setDestMatches] = React.useState<Array<{ stationId: number; stationName: string }>>([]);
+  const [startMatches, setStartMatches] = React.useState<Array<station>>([]);
+  const [destMatches, setDestMatches] = React.useState<Array<station>>([]);
   // Confirmed station selection by user
-  const [selectedStart, setSelectedStart] = React.useState<{ stationId: number; stationName: string } | null>(null);
-  const [selectedDestination, setSelectedDest] = React.useState<{ stationId: number; stationName: string } | null>(null);
+  const [selectedStart, setSelectedStart] = React.useState<station | null>(null);
+  const [selectedDestination, setSelectedDest] = React.useState<station | null>(null);
   // React Native loading states
   const [loadingStart, setLoadingStart] = React.useState(false);
   const [loadingDest, setLoadingDest] = React.useState(false);
@@ -35,6 +33,27 @@ export default function TabTwoScreen() {
     retrieveDisruptions()
       .catch((error) => console.error('Error fetching disruptions on load:', error));
   }, []);
+
+  // Apply selections set from other tabs (e.g. Recent). Populate local inputs
+  React.useEffect(() => {
+    if (!selectedPath) {
+      return;
+    }
+    const startStationFromHistory = {
+      stationId: selectedPath.fromStationId,
+      stationName: selectedPath.fromStationName!,
+    }
+    const endStationFromHistory = {
+      stationId: selectedPath.toStationId,
+      stationName: selectedPath.toStationName!,
+    }
+    onStartStationSelect(startStationFromHistory);
+    onDestStationSelect(endStationFromHistory);
+    // clear shared selection so only applies transfer once
+    if (startStationFromHistory || endStationFromHistory) {
+      setPath(null);
+    }
+  }, [selectedPath]);
 
 
 
@@ -88,6 +107,7 @@ export default function TabTwoScreen() {
       setRoute(cached);
       await logSearchHistory(selectedStart.stationId, selectedDestination.stationId);
       console.log('Optimal route found:', cached);
+      router.push('/(tabs)/map');
     } catch (error) {
       console.error('Failed to retrieve shortest path:', error);
     }

@@ -6,6 +6,9 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { RouteProvider } from '@/contexts/RouteContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+
+
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();

@@ -1,7 +1,7 @@
 import * as GeoJSON from 'geojson';
 import tubeLines from '../assets/tubeLines.json';
 import { Database } from './database';
-import { pathFinderResult } from './pathFinder';
+import { pathFinderResult, } from '@/components/types';
 
 // London Underground line colors
 const LINE_COLORS: { [lineName: string]: string } = {
@@ -19,10 +19,6 @@ const LINE_COLORS: { [lineName: string]: string } = {
     'Elizabeth': '#60399E',
 };
 
-type RouteData = {
-    stations: number[]
-    lines: number[]
-};
 
 function isCorrectFeature(fromNaptanId: string, toNaptanId: string, lineName: string, feature: any) {
     const featureDetail = feature.properties;
