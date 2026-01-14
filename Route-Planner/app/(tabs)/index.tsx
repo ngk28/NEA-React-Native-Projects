@@ -139,6 +139,7 @@ export default function Search() {
           value={startQuery}
           placeholder='Starting station'
           autoCorrect={false}
+          autoCapitalize="none"
         />
         {loadingStart && <Text style={styles.helper}>Searching…</Text>}
         {!loadingStart && selectedStart && <Text style={styles.helper}>Selected: {selectedStart.stationName}</Text>}
@@ -167,6 +168,7 @@ export default function Search() {
           value={destQuery}
           placeholder='Destination station'
           autoCorrect={false}
+          autoCapitalize="none"
         />
         {loadingDest && <Text style={styles.helper}>Searching…</Text>}
         {!loadingDest && selectedDestination && <Text style={styles.helper}>Selected: {selectedDestination.stationName}</Text>}

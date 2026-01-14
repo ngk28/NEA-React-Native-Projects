@@ -17,6 +17,7 @@ const LINE_COLORS: { [lineName: string]: string } = {
     'Victoria': '#039BE5',
     'Waterloo & City': '#76D0BD',
     'Elizabeth': '#60399E',
+    'Interchange - Walking': '#5e3d3d',
 };
 
 

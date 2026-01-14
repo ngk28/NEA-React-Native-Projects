@@ -62,8 +62,8 @@ export default function MapScreen() {
         const minLatitude = Math.min(...latitudes);
         const maxLatitude = Math.max(...latitudes);
         cameraRef.current.fitBounds(
-            [minLongitude, minLatitude - 0.02],
-            [maxLongitude, maxLatitude - 0.02],
+            [minLongitude, minLatitude],
+            [maxLongitude, maxLatitude],
             10, // Padding
             1000 // Animation duration in ms
         );
@@ -121,7 +121,11 @@ export default function MapScreen() {
                             const isStart = (index === 0);
                             const isEnd = (index === stationDetails.length - 1);
                             const isTransfer = (transferStations.some(transferStation => transferStation.Id === station.Id));
-
+                            // Treat 0 as valid coordinate; only skip when null/undefined
+                            if (station.latitude == null || station.longitude == null) {
+                                console.log('Missing coordinates for station:', station);
+                                return null;
+                            }
                             return (
                                 <Mapbox.PointAnnotation
                                     key={`marker-${station.Id}`}

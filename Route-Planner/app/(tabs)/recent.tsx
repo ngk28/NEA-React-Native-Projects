@@ -1,12 +1,11 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { retrieveSearchHistory, searchHistoryEntry, cleanUpSearchHistory, deleteSearchHistory } from '@/components/searchHistoryManager';
-import * as React from 'react';
-import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { cleanUpSearchHistory, deleteSearchHistory, retrieveSearchHistory, searchHistoryEntry } from '@/components/searchHistoryManager';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useRoute } from '@/contexts/RouteContext';
 import { pathKey } from '@/components/types';
+import { useRoute } from '@/contexts/RouteContext';
+import { useRouter } from 'expo-router';
+import * as React from 'react';
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 
 
 export default function RecentScreen() {
@@ -53,18 +52,23 @@ export default function RecentScreen() {
 
     return (
         <View style={styles.container}>
-            <ThemedText type="subtitle">Recent Searches</ThemedText>
-            {recentSearches.map((search, index) => (
-                <ThemedView style={styles.card} key={index}>
-                    <ThemedText type="default">{search.fromStationName} → {search.toStationName}</ThemedText>
-                    <TouchableOpacity onPress={() => handleSearchAgain(search)} style={styles.searchAgainButton}>
-                        <Text style={styles.searchAgainButtonText}>{'>'}</Text>
-                    </TouchableOpacity>
-                </ThemedView>
-            ))}
-            {recentSearches.length === 0 &&
-                <ThemedText type="default">No recent searches found.</ThemedText>
-            }
+            <ThemedText type="subtitle" style={styles.title}>Recent Searches</ThemedText>
+
+            <ScrollView contentContainerStyle={styles.scrollContent} style={{ width: '100%' }}>
+                {recentSearches.length === 0 && (
+                    <ThemedText type="default">No recent searches found.</ThemedText>
+                )}
+
+                {recentSearches.map((search, index) => (
+                    <ThemedView style={styles.card} key={index}>
+                        <ThemedText type="default">{search.fromStationName} → {search.toStationName}</ThemedText>
+                        <TouchableOpacity onPress={() => handleSearchAgain(search)} style={styles.searchAgainButton}>
+                            <Text style={styles.searchAgainButtonText}>{'>'}</Text>
+                        </TouchableOpacity>
+                    </ThemedView>
+                ))}
+            </ScrollView>
+
             <TouchableOpacity onPress={() => clearHistory()} style={styles.deleteButton}>
                 <Text style={styles.deleteButtonText}>Clear Search History</Text>
             </TouchableOpacity>
@@ -76,7 +80,18 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
+        paddingTop: 12,
+    },
+    title: {
+        paddingTop: 24,
+        fontSize: 30,
+        fontWeight: 'bold',
+    },
+    scrollContent: {
+        paddingBottom: 24,
+        paddingTop: 24,
+        alignItems: 'center',
     },
     card: {
         borderRadius: 8,
@@ -106,6 +121,7 @@ const styles = StyleSheet.create({
     },
     deleteButton: {
         marginTop: 16,
+        marginBottom: 24,
         padding: 8,
         borderColor: '#ff0000',
         borderWidth: 1,

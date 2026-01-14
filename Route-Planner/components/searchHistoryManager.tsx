@@ -37,6 +37,7 @@ export async function clearSearchHistory(): Promise<void> {
         throw error;
     }
 }
+const MAX_RESPONSES = 15;
 export async function retrieveSearchHistory(): Promise<Array<searchHistoryEntry>> {
     const db = await openDatabase();
     const query = `
@@ -47,7 +48,6 @@ export async function retrieveSearchHistory(): Promise<Array<searchHistoryEntry>
     try {
         const [response] = await db.executeSql(query);
         const result = response.rows;
-        const MAX_RESPONSES = 15;
         const history: Array<searchHistoryEntry> = [];
         for (let i = 0; i < Math.min(result.length, MAX_RESPONSES); i++) {
             const fromStationName = await Database.retrieveStationName(result.item(i).fromStationId);
@@ -126,12 +126,11 @@ async function changeSearchTimestamp(fromStationId: number, toStationId: number)
     }
 }
 export async function cleanUpSearchHistory(): Promise<void> {
-    const MAX_HISTORY_ENTRIES = 50;
     const count = await getSearchHistoryCount();
-    if (count <= MAX_HISTORY_ENTRIES) {
+    if (count <= MAX_RESPONSES) {
         return;
     }
-    const entriesToDelete = count - MAX_HISTORY_ENTRIES;
+    const entriesToDelete = count - MAX_RESPONSES;
     await deleteOldestSearch(entriesToDelete);
     return;
 }
