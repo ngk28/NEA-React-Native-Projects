@@ -61,7 +61,7 @@ export default function RecentScreen() {
 
                 {recentSearches.map((search, index) => (
                     <ThemedView style={styles.card} key={index}>
-                        <ThemedText type="default">{search.fromStationName} → {search.toStationName}</ThemedText>
+                        <ThemedText type="default" style={styles.station}>{search.fromStationName} → {search.toStationName}</ThemedText>
                         <TouchableOpacity onPress={() => handleSearchAgain(search)} style={styles.searchAgainButton}>
                             <Text style={styles.searchAgainButtonText}>{'>'}</Text>
                         </TouchableOpacity>
@@ -104,6 +104,9 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    station: {
+        maxWidth: 300,
+    },
     searchAgainButton: {
         backgroundColor: '#14853c',
         height: 24,
@@ -111,6 +114,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         alignSelf: 'flex-end',
         marginLeft: 6,
+        alignContent: 'center',
     },
     searchAgainButtonText: {
         color: '#fff',

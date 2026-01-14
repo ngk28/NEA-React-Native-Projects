@@ -75,7 +75,7 @@ async function retrieveLineId(lineName: string): Promise<number> {
 async function open(): Promise<SQLite.SQLiteDatabase> {
     if (databaseInstance) return databaseInstance;
     try {
-        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV7.db', createFromLocation: 1, readOnly: true });
+        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV8.db', createFromLocation: 1, readOnly: true });
         databaseInstance = db;
         return db;
     } catch (error) {

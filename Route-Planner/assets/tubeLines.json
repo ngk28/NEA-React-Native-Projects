@@ -46594,6 +46594,50 @@
         {
             "type": "Feature",
             "properties": {
+                "id": "BatterseaExtension1",
+                "end_sid": "940GZZNEUGST",
+                "name": "Northern",
+                "start_sid": "940GZZBPSUST"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        -0.14177892958851,
+                        51.4798039277841
+                    ],
+                    [
+                        -0.128550355352361,
+                        51.4800915779665
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": "BatterseaExtension2",
+                "end_sid": "940GZZNEUGST",
+                "name": "Northern",
+                "start_sid": "940GZZLUKNG"
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [
+                    [
+                        -0.10547519,
+                        51.488193706
+                    ],
+                    [
+                        -0.128550355352361,
+                        51.4800915779665
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
                 "id": "Embankment1",
                 "end_sid": "940GZZLUEMB",
                 "name": "Northern",
