@@ -1,23 +1,16 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-
-
-// Custom type for route data 
-export type RouteData = {
-    stations: number[];
-    lines: number[];
-    totalTime: number;
-} | null;
+import { pathFinderResult } from '@/components/pathFinder';
 
 type RouteContextType = {
-    route: RouteData;
-    setRoute: (route: RouteData) => void;
+    route: pathFinderResult | null;
+    setRoute: (route: pathFinderResult | null) => void;
 };
 
 // Context allows data to be passed between different tabs
 const RouteContext = createContext<RouteContextType | undefined>(undefined);
 
 export function RouteProvider({ children }: { children: ReactNode }) {
-    const [route, setRoute] = useState<RouteData>(null);
+    const [route, setRoute] = useState<pathFinderResult | null>(null);
 
     return (
         <RouteContext.Provider value={{ route, setRoute }}>

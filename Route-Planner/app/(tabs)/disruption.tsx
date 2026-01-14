@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
-import { disruptionEvent, retrieveDisruptions } from '@/components/disruptionAPI';
+import { disruptionEvent, getLastDisruptionFetchTime, retrieveDisruptions } from '@/components/disruptionAPI';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
@@ -10,15 +10,25 @@ export default function DisruptionScreen() {
   const [disruptions, setDisruptions] = useState<disruptionEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [fetchError, setFetchError] = useState<boolean>(false);
 
   const fetchDisruptions = async () => {
     try {
       setLoading(true);
       const data = await retrieveDisruptions();
+      const fetchTime = await getLastDisruptionFetchTime();
+      if (fetchTime === lastUpdated) { // No new fetch data
+        setFetchError(true);
+        setLoading(false);
+        return;
+      }
       setDisruptions(data);
-      setLastUpdated(new Date());
+      setLastUpdated(fetchTime);
+      setFetchError(false);
+      setLoading(false);
     } catch (error) {
       console.error('Error retrieving disruptions:', error);
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -48,7 +58,7 @@ export default function DisruptionScreen() {
 
   return (
     <View style={styles.container}>
-      <ThemedText type="subtitle" style={styles.header}>Tube Line Disruptions</ThemedText>
+      <ThemedText type="subtitle">Tube Line Disruptions</ThemedText>
       {lastUpdated && (
         <ThemedText type="default" style={styles.updated}>Last updated: {lastUpdated.toLocaleTimeString()}</ThemedText>
       )}
@@ -59,6 +69,11 @@ export default function DisruptionScreen() {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchDisruptions} />}
         contentContainerStyle={styles.listContent}
       />
+      {fetchError && !loading && (
+        <View style={styles.errorPopUp}>
+          <ThemedText type="default">Error fetching disruptions - Check your connection. Please try again.</ThemedText>
+        </View>
+      )}
     </View>
   );
 }
@@ -68,9 +83,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 12,
-  },
-  header: {
-    marginBottom: 4,
   },
   updated: {
     marginBottom: 12,
@@ -90,5 +102,17 @@ const styles = StyleSheet.create({
   },
   reason: {
     marginTop: 4,
+  },
+  errorPopUp: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    backgroundColor: '#ffcccc',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#ff0000',
+    alignItems: 'center',
   },
 });

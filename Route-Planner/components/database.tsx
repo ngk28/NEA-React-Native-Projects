@@ -14,6 +14,7 @@ export interface Database {
     retrieveStationsByName(searchTerm: string): Promise<Array<{ stationId: number; stationName: string }>>;
     retrieveLineName(lineId: number): Promise<string>;
     retrieveNaptanId(stationId: number): Promise<string>;
+    retrieveLineId(lineName: string): Promise<number>;
 }
 
 export const Database: Database = {
@@ -26,6 +27,7 @@ export const Database: Database = {
     retrieveStationsByName: retrieveStationsByName,
     retrieveLineName: retrieveLineName,
     retrieveNaptanId: retrieveNaptanId,
+    retrieveLineId: retrieveLineId,
 };
 
 async function retrieveStationCoordinate(stationId: number): Promise<[number, number]> {
@@ -49,11 +51,31 @@ async function retrieveStationCoordinate(stationId: number): Promise<[number, nu
         throw error;
     }
 }
-
+async function retrieveLineId(lineName: string): Promise<number> {
+    const command = `
+        SELECT lineId
+        FROM lines
+        WHERE lineName = ?;
+    `;
+    const db = await open();
+    try {
+        const [response] = await db.executeSql(command, [lineName]);
+        const result = response.rows;
+        if (result.length > 0) {
+            const lineId = result.item(0).lineId;
+            return lineId;
+        } else {
+            throw new Error(`Line with name ${lineName} not found.`);
+        }
+    } catch (error) {
+        console.error('Error retrieving line ID:', error);
+        throw error;
+    }
+}
 async function open(): Promise<SQLite.SQLiteDatabase> {
     if (databaseInstance) return databaseInstance;
     try {
-        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV6.db', createFromLocation: 1, readOnly: true });
+        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV7.db', createFromLocation: 1, readOnly: true });
         databaseInstance = db;
         return db;
     } catch (error) {

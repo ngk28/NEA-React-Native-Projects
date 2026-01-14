@@ -1,6 +1,7 @@
 import * as GeoJSON from 'geojson';
 import tubeLines from '../assets/tubeLines.json';
 import { Database } from './database';
+import { pathFinderResult } from './pathFinder';
 
 // London Underground line colors
 const LINE_COLORS: { [lineName: string]: string } = {
@@ -66,13 +67,13 @@ async function findFeatureForNaptanPair(fromStationId: number, toStationId: numb
     return features;
 }
 
-export async function buildRouteFeatureCollection(route: RouteData): Promise<GeoJSON.FeatureCollection> {
+export async function buildRouteFeatureCollection(route: pathFinderResult): Promise<GeoJSON.FeatureCollection> {
     const features: GeoJSON.Feature[] = [];
 
-    for (let i = 0; i < route.stations.length - 1; i++) {
-        const fromStationId = route.stations[i];
-        const toStationId = route.stations[i + 1];
-        const lineId = route.lines[i];
+    for (let i = 0; i < route.optimalStationSequence.length - 1; i++) {
+        const fromStationId = route.optimalStationSequence[i];
+        const toStationId = route.optimalStationSequence[i + 1];
+        const lineId = route.optimizedLineSequence[i];
 
         try {
             const featuresForPair = await findFeatureForNaptanPair(fromStationId, toStationId, lineId); // there can be multiple features for a pair of stations in the JSON 

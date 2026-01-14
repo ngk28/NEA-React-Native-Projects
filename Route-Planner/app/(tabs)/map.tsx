@@ -1,10 +1,10 @@
 import { buildRouteFeatureCollection } from '@/components/jsonManager';
-import { generateStationCoords, stationCoords } from '@/components/markers';
 import { generateStationLineList, generateTransferStationList, station } from '@/components/pathFinder';
 import { useRoute } from '@/contexts/RouteContext';
 import Mapbox from "@rnmapbox/maps";
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
 
 const accessToken = "pk.eyJ1Ijoiam4xMzI0IiwiYSI6ImNtZ2txMGg5bzB0c3oyanNneHk2NzhiM2YifQ.Y9SOFJzcEKXBcp5vWZ4-og";
 
@@ -18,7 +18,7 @@ export default function MapScreen() {
 
     const [stationDetails, setStationDetails] = useState<Array<station>>([]);
     const [transferStations, setTransferStations] = useState<Array<station>>([]);
-    const [stationCoords, setStationCoords] = useState<Array<stationCoords>>([]);
+    const [selectedStation, setSelectedStation] = useState<station | null>(null);
     const [popupVisible, setPopupVisible] = useState(false);
     const [expanded, setExpanded] = useState(false);
 
@@ -39,8 +39,6 @@ export default function MapScreen() {
             setStationDetails(stationDetail);
             const transferStations = await generateTransferStationList();
             setTransferStations(transferStations);
-            const stationCoords = await generateStationCoords();
-            setStationCoords(stationCoords);
         } catch (err) {
             console.error('Failed to build popup data:', err);
         }
@@ -121,25 +119,62 @@ export default function MapScreen() {
 
                         {/* Station markers */}
                         {stationDetails.map((station, index) => {
-                            const stationCoord = stationCoords.find(coord => coord.stationId === station.stationId);
-                            if (!stationCoord) return null;
                             const isStart = (index === 0);
                             const isEnd = (index === stationDetails.length - 1);
-                            const isTransfer = (transferStations.some(transferStation => transferStation.stationId === station.stationId));
+                            const isTransfer = (transferStations.some(transferStation => transferStation.Id === station.Id));
 
-                            let markerStyle = styles.intermediateMarker;
-                            if (isStart) markerStyle = styles.startMarker;
-                            else if (isEnd) markerStyle = styles.endMarker;
-                            else if (isTransfer) markerStyle = styles.transferMarker;
                             return (
-                                <Mapbox.PointAnnotation key={`marker-${station.stationId}`} id={`marker-${station.stationId}`} coordinate={stationCoord.coordinates}>
-                                    <View style={markerStyle} />
+                                <Mapbox.PointAnnotation
+                                    key={`marker-${station.Id}`}
+                                    id={`marker-${station.Id}`}
+                                    coordinate={[station.latitude!, station.longitude!]} // Mapbox expects [latitude, longitude] 
+                                    anchor={{ x: 0.5, y: 1.01 }}
+                                    onSelected={() => setSelectedStation(station)}
+                                    onDeselected={() => setSelectedStation(null)}
+                                >
+                                    <View>
+                                        {isStart ? (
+                                            <Image
+                                                source={require('../../assets/blueMarker.png')}
+                                                style={styles.startMarker}
+                                            />
+                                        ) : isEnd ? (
+                                            <Image
+                                                source={require('../../assets/redMarker.png')}
+                                                style={styles.endMarker}
+                                            />
+                                        ) : isTransfer ? (
+                                            <Image
+                                                source={require('../../assets/greenMarker.png')}
+                                                style={styles.transferMarker}
+                                            />
+                                        ) : (
+                                            <Image
+                                                source={require('../../assets/greyMarker.png')}
+                                                style={styles.intermediateMarker}
+                                            />
+                                        )}
+                                    </View>
                                 </Mapbox.PointAnnotation>
                             );
                         })}
                     </>
                 )}
             </Mapbox.MapView>
+
+            {selectedStation && (
+                <View style={styles.stationPopup}>
+                    <Text style={styles.stationName}>{selectedStation.Name}</Text>
+                    <Text style={styles.stationDetails}>Line: {
+                        (selectedStation.fromLineName === null) ? (`${selectedStation.toLineName}`) :
+                            (selectedStation.toLineName === null) ? (`${selectedStation.fromLineName}`) :
+                                (selectedStation.fromLineName === selectedStation.toLineName) ? (`${selectedStation.fromLineName}`) :
+                                    `${selectedStation.fromLineName} → ${selectedStation.toLineName}`}</Text>
+                    <TouchableOpacity onPress={() => setSelectedStation(null)} style={styles.closeStationPopup}>
+                        <Text style={styles.closeStationPopupText}>Close</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {popupVisible && route && (
                 <View style={styles.popupContainer}>
@@ -151,14 +186,14 @@ export default function MapScreen() {
 
                         {stationDetails.length > 0 && (
                             <View style={styles.routeSummary}>
-                                <Text style={styles.routeStartEndPoint}>{stationDetails[0].stationName} → {stationDetails[stationDetails.length - 1].stationName}</Text>
+                                <Text style={styles.routeStartEndPoint}>{stationDetails[0].Name} → {stationDetails[stationDetails.length - 1].Name}</Text>
                             </View>
                         )}
 
                         <View style={styles.transfersList}>
                             {transferStations.map((transferStation) => (
-                                <View style={styles.transferItem} key={`transfer-${transferStation.stationId}`}>
-                                    <Text style={styles.transferName}>{transferStation.stationName}</Text>
+                                <View style={styles.transferItem} key={`transfer-${transferStation.Id}`}>
+                                    <Text style={styles.transferName}>{transferStation.Name}</Text>
                                     <Text style={styles.transferLines}>{transferStation.toLineName}</Text>
                                 </View>
                             ))}
@@ -176,9 +211,9 @@ export default function MapScreen() {
                         {expanded && (
                             <ScrollView style={styles.expandedList}>
                                 {stationDetails.map((station, indexNumber) => (
-                                    <View key={`station-${station.stationId}-${indexNumber}`} style={styles.expandedItem}>
+                                    <View key={`station-${station.Id}-${indexNumber}`} style={styles.expandedItem}>
                                         <Text style={styles.expandedIndex}>{indexNumber + 1}.</Text>
-                                        <Text style={styles.expandedName}>{station.stationName}</Text>
+                                        <Text style={styles.expandedName}>{station.Name}</Text>
                                         <Text style={styles.expandedLine}>{station.fromLineName === null ? `${station.toLineName}` : ''}</Text>
                                         <Text style={styles.expandedLine}>{(station.fromLineName !== station.toLineName) && (station.fromLineName !== null) && (station.toLineName !== null) ? `${station.fromLineName} → ${station.toLineName}` : ''}</Text>
                                         <Text style={styles.expandedLine}>{station.toLineName === null ? `${station.fromLineName}` : ''}</Text>
@@ -195,19 +230,61 @@ export default function MapScreen() {
                     </View>
                 </View>
             )}
+
+            {!popupVisible && route && (
+                <TouchableOpacity onPress={() => setPopupVisible(true)} style={styles.openPopupButton}>
+                    <Text style={styles.openPopupButtonText}>Show Route</Text>
+                </TouchableOpacity>
+            )}
         </View>
-
-
-
-
-
-
-
-
     );
 }
 
 const styles = StyleSheet.create({
+    openPopupButton: {
+        position: 'absolute',
+        bottom: 30,
+        left: 20,
+        right: 20,
+        backgroundColor: '#007AFF',
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    openPopupButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    stationPopup: {
+        position: 'absolute',
+        top: 30,
+        left: 20,
+        right: 20,
+        backgroundColor: '#ffffff',
+        borderRadius: 10,
+        padding: 15,
+        alignItems: 'center',
+    },
+    stationDetails: {
+        fontSize: 16,
+        marginBottom: 10,
+    },
+    closeStationPopup: {
+        marginTop: 10,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        backgroundColor: '#d00',
+        borderRadius: 5,
+    },
+    closeStationPopupText: {
+        color: '#fff',
+        fontSize: 14,
+    },
+    stationName: {
+        fontSize: 18,
+        marginBottom: 8,
+    },
     popupContainer: {
         position: 'absolute',
         left: 10,
@@ -298,37 +375,23 @@ const styles = StyleSheet.create({
         marginLeft: 6,
     },
     startMarker: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#0a84ff',
-        borderWidth: 2,
-        borderColor: '#fff',
+        width: 45,
+        height: 45,
         opacity: 0.95,
     },
     endMarker: {
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: '#ff3b30',
-        borderWidth: 2,
-        borderColor: '#fff',
+        width: 40,
+        height: 60,
         opacity: 0.95,
     },
     transferMarker: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: '#ffcc00',
+        width: 50,
+        height: 50,
         opacity: 0.95,
-        borderWidth: 1,
-        borderColor: '#fff',
     },
     intermediateMarker: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#000',
-        opacity: 0.45,
+        width: 30,
+        height: 30,
+        opacity: 0.95,
     },
 });

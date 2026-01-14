@@ -8,7 +8,8 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRoute } from '@/contexts/RouteContext';
 import * as React from 'react';
 import { ScrollView } from 'react-native';
-
+import { retrieveDisruptions } from '@/components/disruptionAPI';
+import { logSearchHistory } from '@/components/searchHistoryManager';
 type station = {
   stationId: number;
   stationName: string;
@@ -28,10 +29,14 @@ export default function TabTwoScreen() {
   // React Native loading states
   const [loadingStart, setLoadingStart] = React.useState(false);
   const [loadingDest, setLoadingDest] = React.useState(false);
-  const [pathFound, setPathFound] = React.useState(false);
 
-  const [shortestPath, setShortestPath] = React.useState<Array<number>>([]);
-  const [shortestTime, setShortestTime] = React.useState<number>(0);
+  // Fetch disruptions on component load to allow caching and calculation in pathfinding
+  React.useEffect(() => {
+    retrieveDisruptions()
+      .catch((error) => console.error('Error fetching disruptions on load:', error));
+  }, []);
+
+
 
   React.useEffect(() => {
     if (startQuery.trim().length < 2) { // Too short to search
@@ -80,18 +85,9 @@ export default function TabTwoScreen() {
     try {
       const optimalRoute = await retrieveOptimalRoute(selectedStart.stationId, selectedDestination.stationId);
       const cached = optimalRoute;
-      if (cached) {
-        setShortestTime(cached.totalTime);
-        setShortestPath(cached.optimalStationSequence);
-        setPathFound(true);
-        // Share route with map tab
-        setRoute({
-          stations: cached.optimalStationSequence,
-          lines: cached.optimizedLineSequence,
-          totalTime: cached.totalTime,
-        });
-        console.log('Optimal route found:', cached);
-      }
+      setRoute(cached);
+      await logSearchHistory(selectedStart.stationId, selectedDestination.stationId);
+      console.log('Optimal route found:', cached);
     } catch (error) {
       console.error('Failed to retrieve shortest path:', error);
     }
@@ -173,8 +169,6 @@ export default function TabTwoScreen() {
         title="Find Path"
         onPress={handleFindPath}
       />
-
-      { }
     </ParallaxScrollView>
   );
 }

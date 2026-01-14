@@ -11,9 +11,9 @@ export async function generateStationCoords(): Promise<stationCoords[]> {
     const stations = await generateStationLineList();
     try {
         for (let i = 0; i < stations.length; i++) {
-            const coordinate = await Database.retrieveStationCoordinate(stations[i].stationId);
+            const coordinate = await Database.retrieveStationCoordinate(stations[i].Id);
             const stationCoord = {
-                stationId: stations[i].stationId,
+                stationId: stations[i].Id,
                 coordinates: coordinate,
             }
             stationCoordsList.push(stationCoord);
