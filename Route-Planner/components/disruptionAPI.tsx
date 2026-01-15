@@ -4,8 +4,13 @@ import { Database } from "./database";
 
 const API_KEY = '1a771aa56d4743848a262e4d2160b34f';
 
+// Timeout for disruption fetch - milliseconds
+const DISRUPTION_FETCH_TIMEOUT_MS = 7000;
+
 async function queryDisruptionAPI() {
     const url = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), DISRUPTION_FETCH_TIMEOUT_MS);
     try {
         const response = await fetch(url, {
             method: 'GET',
@@ -14,11 +19,21 @@ async function queryDisruptionAPI() {
                 'Cache-Control': 'no-cache',
                 'app_key': API_KEY,
             },
+            signal: controller.signal,
         });
-        const data = await response.json();
-        console.log(`Disruptions fetched at ${new Date()}`);
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+            const err = new Error(`Disruption API failed with status ${response.status}`);
+            console.error(err);
+            throw err;
+        }
+
+        const data = response.json();
+        console.log(`Disruption fetched at ${new Date()}`);
         return data;
     } catch (error) {
+        clearTimeout(timeout);
         console.error('Error fetching disruptions:', error);
         throw error;
     }
@@ -101,7 +116,11 @@ export async function retrieveDisruptions() {
         cachedDisruptionData = disruptions;
         return disruptions;
     } catch (error) {
-        console.error('Error retrieving disruptions:', error);
-        throw error;
+        console.warn('Failed to fetch disruption from API:', error);
+        if (cachedDisruptionData && cachedDisruptionData.length > 0) {
+            // Use cached data if available
+            return cachedDisruptionData;
+        }
+        return [];
     }
 }

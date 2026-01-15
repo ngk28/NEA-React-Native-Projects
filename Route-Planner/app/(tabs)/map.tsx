@@ -5,14 +5,17 @@ import Mapbox from "@rnmapbox/maps";
 import React, { useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+const MAPBOX_STYLE_URL = "mapbox://styles/jn1324/cmdn5a594001501pjh1jc8d4m";
 const accessToken = "pk.eyJ1Ijoiam4xMzI0IiwiYSI6ImNtZ2txMGg5bzB0c3oyanNneHk2NzhiM2YifQ.Y9SOFJzcEKXBcp5vWZ4-og";
 
 Mapbox.setAccessToken(accessToken);
 Mapbox.setTelemetryEnabled(false);
 
+
 export default function MapScreen() {
     const { route } = useRoute();
     const [routeGeoJSON, setRouteGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
+    const [offlineMap, setOfflineMap] = useState<any | null>(null);
     const cameraRef = useRef<Mapbox.Camera>(null);
 
     const [stationDetails, setStationDetails] = useState<Array<station>>([]);
@@ -68,6 +71,42 @@ export default function MapScreen() {
             1000 // Animation duration in ms
         );
     }
+    async function downloadMap() {
+        try {
+            const offlineMap = await Mapbox.offlineManager.createPack({
+                name: "LondonDownload",
+                styleURL: MAPBOX_STYLE_URL,
+                minZoom: 10,
+                maxZoom: 20,
+                bounds: [[-0.55240631, 51.322030], [0.27980804, 51.749989]], // London bounding box
+            },
+                (offlinePack, status) => {
+                    if (status.percentage % 10 == 0) {
+                        console.log(`Map download progress: ${status.percentage}%`);
+                    }
+                },
+                (offlinePack, error) => {
+                    console.error("Error downloading map pack:", error);
+                });
+            return offlineMap;
+        } catch (error) {
+            console.error("Error downloading map:", error);
+        }
+    }
+
+
+
+    useEffect(() => {
+        async () => {
+            try {
+                const offlineMap = await downloadMap();
+                setOfflineMap(offlineMap);
+                console.log("Map downloading");
+            } catch (error) {
+                console.error("Error downloading map:", error);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!route) {
@@ -90,9 +129,8 @@ export default function MapScreen() {
 
     return (
         <View style={{ flex: 1 }}>
-            <Mapbox.MapView style={{ flex: 1 }} styleURL={"mapbox://styles/jn1324/cmdn5a594001501pjh1jc8d4m"}>
+            <Mapbox.MapView style={{ flex: 1 }} styleURL={MAPBOX_STYLE_URL} offlinePacks={offlineMap}>
 
-                {/* Map 'Camera'*/}
                 <Mapbox.Camera
                     ref={cameraRef}
                     zoomLevel={12}
@@ -102,7 +140,6 @@ export default function MapScreen() {
 
                 {routeGeoJSON && routeGeoJSON.features.length > 0 && (
                     <>
-                        {/* Displays route onto map */}
                         {routeGeoJSON.features.map((feature, index) => (
                             <Mapbox.ShapeSource key={`route-${index}`} id={`route-${index}`} shape={feature}>
                                 <Mapbox.LineLayer
@@ -116,7 +153,6 @@ export default function MapScreen() {
                             </Mapbox.ShapeSource>
                         ))}
 
-                        {/* Station markers */}
                         {stationDetails.map((station, index) => {
                             const isStart = (index === 0);
                             const isEnd = (index === stationDetails.length - 1);
@@ -224,11 +260,6 @@ export default function MapScreen() {
                                 ))}
                             </ScrollView>
                         )}
-
-                        {/* expanded show disruption if necessary */}
-
-
-
 
                     </View>
                 </View>
