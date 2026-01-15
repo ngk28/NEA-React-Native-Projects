@@ -1,97 +1,93 @@
-import { Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Database } from '@/components/database';
+import { retrieveDisruptions } from '@/components/disruptionAPI';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { retrieveOptimalRoute } from '@/components/pathFinder';
+import { logSearchHistory } from '@/components/searchHistoryManager';
 import { ThemedText } from '@/components/themed-text';
+import { tubeDatabase } from '@/components/tubeDatabase';
+import { station } from '@/components/types';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRoute } from '@/contexts/RouteContext';
-import * as React from 'react';
-import { ScrollView } from 'react-native';
-import { retrieveDisruptions } from '@/components/disruptionAPI';
-import { logSearchHistory } from '@/components/searchHistoryManager';
-import { station } from '@/components/types';
 import { useRouter } from 'expo-router';
+import * as React from 'react';
+import { Button, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-export default function Search() {
+export default function SearchScreen() {
   const { setRoute, path: selectedPath, setPath } = useRoute();
   const router = useRouter();
-  // Process
+  // User text input to search for stations 
   const [startQuery, setStartQuery] = React.useState('');
-  const [destQuery, setDestQuery] = React.useState('');
-  // Search results given a text input - station not confirmed by user yet
-  const [startMatches, setStartMatches] = React.useState<Array<station>>([]);
-  const [destMatches, setDestMatches] = React.useState<Array<station>>([]);
+  const [destinationQuery, setDestinationQuery] = React.useState('');
+  // Station search results for a given text input - station not yet confirmed by user
+  const [startSuggestions, setStartSuggestions] = React.useState<Array<station>>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = React.useState<Array<station>>([]);
   // Confirmed station selection by user
   const [selectedStart, setSelectedStart] = React.useState<station | null>(null);
-  const [selectedDestination, setSelectedDest] = React.useState<station | null>(null);
+  const [selectedDestination, setSelectedDestination] = React.useState<station | null>(null);
   // React Native loading states
   const [loadingStart, setLoadingStart] = React.useState(false);
-  const [loadingDest, setLoadingDest] = React.useState(false);
+  const [loadingDestination, setLoadingDestination] = React.useState(false);
 
-  // Fetch disruptions on component load to allow caching and calculation in pathfinding
+  // Fetch disruptions on program load to allow caching and calculation in pathfinding
   React.useEffect(() => {
     retrieveDisruptions()
       .catch((error) => console.error('Error fetching disruptions on load:', error));
   }, []);
 
-  // Apply selections set from other tabs (e.g. Recent). Populate local inputs
+  // Apply station selections set from recent history
   React.useEffect(() => {
     if (!selectedPath) {
       return;
     }
     const startStationFromHistory = {
-      stationId: selectedPath.fromStationId,
-      stationName: selectedPath.fromStationName!,
+      id: selectedPath.fromStationId,
+      name: selectedPath.fromStationName!,
     }
     const endStationFromHistory = {
-      stationId: selectedPath.toStationId,
-      stationName: selectedPath.toStationName!,
+      id: selectedPath.toStationId,
+      name: selectedPath.toStationName!,
     }
-    onStartStationSelect(startStationFromHistory);
-    onDestStationSelect(endStationFromHistory);
-    // clear shared selection so only applies transfer once
-    if (startStationFromHistory || endStationFromHistory) {
-      setPath(null);
-    }
+    handleStartStationSelection(startStationFromHistory);
+    handleDestinationStationSelection(endStationFromHistory);
+    setPath(null); // clear shared selection so only applies transfer once
   }, [selectedPath]);
 
-
-
+  // Search for starting station suggestions when user types
   React.useEffect(() => {
-    if (startQuery.trim().length < 2) { // Too short to search
-      setStartMatches([]); // Clears any previous matches 
+    if (startQuery.trim().length < 2) { // Too short to search for stations
+      setStartSuggestions([]); // Clears any previous suggestions 
       return;
     }
-    setLoadingStart(true); // React Native set loading state (program knows we're searching)
-    Database.retrieveStationsByName(startQuery)
-      .then(setStartMatches)
-      .catch((err) => console.error('Start search failed:', err))
+    setLoadingStart(true);
+    tubeDatabase.retrieveStationSuggestions(startQuery)
+      .then(setStartSuggestions)
+      .catch((error) => console.error('Start suggestion failed:', error))
       .finally(() => setLoadingStart(false));
   }, [startQuery]);
 
+  // Search for destination station suggestions when user types
   React.useEffect(() => {
-    if (destQuery.trim().length < 2) { // Too short to search
-      setDestMatches([]); // Clears any previous matches
+    if (destinationQuery.trim().length < 2) {
+      setDestinationSuggestions([]);
       return;
     }
-    setLoadingDest(true);
-    Database.retrieveStationsByName(destQuery)
-      .then(setDestMatches)
-      .catch((err) => console.error('Destination search failed:', err))
-      .finally(() => setLoadingDest(false));
-  }, [destQuery]);
+    setLoadingDestination(true);
+    tubeDatabase.retrieveStationSuggestions(destinationQuery)
+      .then(setDestinationSuggestions)
+      .catch((error) => console.error('Destination suggestion failed:', error))
+      .finally(() => setLoadingDestination(false));
+  }, [destinationQuery]);
 
 
-  const onStartStationSelect = (startStation: station) => {
+  const handleStartStationSelection = (startStation: station) => {
     setSelectedStart(startStation);
-    setStartQuery(startStation.stationName);
-    setStartMatches([]);
+    setStartQuery(startStation.name);
+    setStartSuggestions([]);
   };
 
-  const onDestStationSelect = (destinationStation: station) => {
-    setSelectedDest(destinationStation);
-    setDestQuery(destinationStation.stationName);
-    setDestMatches([]);
+  const handleDestinationStationSelection = (destinationStation: station) => {
+    setSelectedDestination(destinationStation);
+    setDestinationQuery(destinationStation.name);
+    setDestinationSuggestions([]);
   };
 
   const handleFindPath = async () => {
@@ -100,20 +96,18 @@ export default function Search() {
       return;
     }
 
-    console.log('Finding path from', selectedStart.stationName, 'to', selectedDestination.stationName);
+    console.log('Finding path from', selectedStart.name, 'to', selectedDestination.name);
     try {
-      const optimalRoute = await retrieveOptimalRoute(selectedStart.stationId, selectedDestination.stationId);
+      const optimalRoute = await retrieveOptimalRoute(selectedStart.id, selectedDestination.id);
       const cached = optimalRoute;
       setRoute(cached);
-      await logSearchHistory(selectedStart.stationId, selectedDestination.stationId);
+      await logSearchHistory(selectedStart.id, selectedDestination.id);
       console.log('Optimal route found:', cached);
       router.push('/(tabs)/map');
     } catch (error) {
       console.error('Failed to retrieve shortest path:', error);
     }
   };
-
-
 
   return (
     <ParallaxScrollView
@@ -129,11 +123,12 @@ export default function Search() {
 
       <ThemedText>Choose stations to plan a route.</ThemedText>
 
-      <View style={styles.fieldGroup}>
+      {/* Starting station input and suggestions */}
+      <View style={styles.inputFieldContainer}>
         <TextInput
-          style={styles.input}
-          onChangeText={(text) => {
-            setStartQuery(text);
+          style={styles.searchInput}
+          onChangeText={(userInput) => {
+            setStartQuery(userInput);
             setSelectedStart(null);
           }}
           value={startQuery}
@@ -141,52 +136,55 @@ export default function Search() {
           autoCorrect={false}
           autoCapitalize="none"
         />
-        {loadingStart && <Text style={styles.helper}>Searching…</Text>}
-        {!loadingStart && selectedStart && <Text style={styles.helper}>Selected: {selectedStart.stationName}</Text>}
+
+        {loadingStart && <Text style={styles.feedbackText}>Searching…</Text>}
+        {!loadingStart && selectedStart && <Text style={styles.feedbackText}>Selected: {selectedStart.name}</Text>}
         {selectedStart === null && (
-          <ScrollView style={styles.suggestions}>
-            {startMatches.length > 0 ? (
-              startMatches.map((station) => (
-                <TouchableOpacity style={styles.listItem} key={String(station.stationId)} onPress={() => onStartStationSelect(station)}>
-                  <Text>{station.stationName}</Text>
+          <ScrollView style={styles.stationSuggestions}>
+            {startSuggestions.length > 0 ? (
+              startSuggestions.map((station) => (
+                <TouchableOpacity style={styles.stationItem} key={String(station.id)} onPress={() => handleStartStationSelection(station)}>
+                  <Text>{station.name}</Text>
                 </TouchableOpacity>
               ))
             ) : (
-              startQuery.trim().length >= 2 && !loadingStart ? <Text style={styles.helper}>No matches</Text> : null
+              (startQuery.trim().length >= 2 && !loadingStart) ? <Text style={styles.feedbackText}>No matches</Text> : null
             )}
           </ScrollView>
         )}
       </View>
 
-      <View style={styles.fieldGroup}>
+      {/* Destination station input and suggestions */}
+      <View style={styles.inputFieldContainer}>
         <TextInput
-          style={styles.input}
-          onChangeText={(text) => {
-            setDestQuery(text);
-            setSelectedDest(null);
+          style={styles.searchInput}
+          onChangeText={(userInput) => {
+            setDestinationQuery(userInput);
+            setSelectedDestination(null);
           }}
-          value={destQuery}
+          value={destinationQuery}
           placeholder='Destination station'
           autoCorrect={false}
           autoCapitalize="none"
         />
-        {loadingDest && <Text style={styles.helper}>Searching…</Text>}
-        {!loadingDest && selectedDestination && <Text style={styles.helper}>Selected: {selectedDestination.stationName}</Text>}
+        {loadingDestination && <Text style={styles.feedbackText}>Searching…</Text>}
+        {!loadingDestination && selectedDestination && <Text style={styles.feedbackText}>Selected: {selectedDestination.name}</Text>}
         {selectedDestination === null && (
-          <ScrollView style={styles.suggestions}>
-            {destMatches.length > 0 ? (
-              destMatches.map((item) => (
-                <TouchableOpacity key={String(item.stationId)} style={styles.listItem} onPress={() => onDestStationSelect(item)}>
-                  <Text>{item.stationName}</Text>
+          <ScrollView style={styles.stationSuggestions}>
+            {destinationSuggestions.length > 0 ? (
+              destinationSuggestions.map((station) => (
+                <TouchableOpacity style={styles.stationItem} key={String(station.id)} onPress={() => handleDestinationStationSelection(station)}>
+                  <Text>{station.name}</Text>
                 </TouchableOpacity>
               ))
             ) : (
-              destQuery.trim().length >= 2 && selectedDestination === null && !loadingDest ? <Text style={styles.helper}>No matches</Text> : null
+              (destinationQuery.trim().length >= 2 && !loadingDestination) ? <Text style={styles.feedbackText}>No matches</Text> : null
             )}
           </ScrollView>
         )}
       </View>
 
+      {/* Search button */}
       <Button
         title="Find Path"
         onPress={handleFindPath}
@@ -206,11 +204,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  fieldGroup: {
+  inputFieldContainer: {
     marginBottom: 16,
     gap: 8,
   },
-  input: {
+  searchInput: {
     height: 44,
     borderWidth: 1,
     borderColor: '#ccc',
@@ -218,16 +216,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#fff',
   },
-  listItem: {
+  stationItem: {
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#ddd',
   },
-  suggestions: {
+  stationSuggestions: {
     maxHeight: 160,
   },
-  helper: {
+  feedbackText: {
     color: '#666',
   },
 });

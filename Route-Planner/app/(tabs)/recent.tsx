@@ -1,12 +1,11 @@
-import { cleanUpSearchHistory, deleteSearchHistory, retrieveSearchHistory, searchHistoryEntry } from '@/components/searchHistoryManager';
+import { cleanUpSearchHistory, deleteSearchHistory, retrieveSearchHistory } from '@/components/searchHistoryManager';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { pathKey } from '@/components/types';
+import { searchHistoryEntry, segmentKey } from '@/components/types';
 import { useRoute } from '@/contexts/RouteContext';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
-
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function RecentScreen() {
     const [recentSearches, setRecentSearches] = React.useState<Array<searchHistoryEntry>>([]);
@@ -27,24 +26,22 @@ export default function RecentScreen() {
         cleanUpSearchHistory(); // Clean up old entries to prevent overflow
     }, [route]);
 
+    // Share selected path to search page
     const handleSearchAgain = (search: searchHistoryEntry) => {
-        // Share selected path to search page
-        const selectedPath: pathKey = {
+        const selectedPath: segmentKey = {
             fromStationId: search.fromStationId,
             toStationId: search.toStationId,
             fromStationName: search.fromStationName,
             toStationName: search.toStationName,
         };
         setPath(selectedPath);
-        // Navigate back to the Search tab (index)
-        router.push('/');
+        router.push('/'); // Navigate back to the Search tab (index)
     }
 
     const clearHistory = async () => {
         try {
             await deleteSearchHistory();
             setRecentSearches([]);
-            fetchRecentSearches();
         } catch (error) {
             console.error('Error clearing search history:', error);
         }

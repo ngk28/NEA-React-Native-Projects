@@ -1,22 +1,22 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { pathFinderResult, pathKey } from '@/components/types';
+import { optimalRouteOutcome, segmentKey } from '@/components/types';
+import React, { createContext, ReactNode, useContext, useState } from 'react';
 
 
 
 
 type RouteContextType = {
-    route: pathFinderResult | null;
-    setRoute: (route: pathFinderResult | null) => void;
-    path: pathKey | null;
-    setPath: (path: pathKey | null) => void;
+    route: optimalRouteOutcome | null;
+    setRoute: (route: optimalRouteOutcome | null) => void;
+    path: segmentKey | null;
+    setPath: (path: segmentKey | null) => void;
 };
 
 // Context allows data to be passed between different tabs
 const RouteContext = createContext<RouteContextType | undefined>(undefined);
 
 export function RouteProvider({ children }: { children: ReactNode }) {
-    const [route, setRoute] = useState<pathFinderResult | null>(null);
-    const [path, setPath] = useState<pathKey | null>(null);
+    const [route, setRoute] = useState<optimalRouteOutcome | null>(null);
+    const [path, setPath] = useState<segmentKey | null>(null);
     return (
         <RouteContext.Provider value={{ route, setRoute, path, setPath }}>
             {children}

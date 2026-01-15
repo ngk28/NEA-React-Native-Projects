@@ -1,16 +1,45 @@
-// https://api-portal.tfl.gov.uk/api-details#api=Line&operation=Line_StatusByModeByPathModesQueryDetailQuerySeverityLevel
-
-import { Database } from "./database";
+import { tubeDatabase } from "./tubeDatabase";
+import { disruptionEvent } from "./types";
 
 const API_KEY = '1a771aa56d4743848a262e4d2160b34f';
+const DISRUPTION_FETCH_TIMEOUT_IN_SECONDS = 7;
+const severityLevelTime: { [severity: number]: number } = {
+    // Convert TFL API severity levels to estimated delay times in minutes
+    10: 0,   // Good Service
+    9: 15,   // Minor Delays
+    6: 30,  // Severe Delays
+    5: 60,  // Part Suspended
+}
 
-// Timeout for disruption fetch - milliseconds
-const DISRUPTION_FETCH_TIMEOUT_MS = 7000;
+let cachedDisruptionData: Array<disruptionEvent> | null = null;
+let lastFetchTime: Date | null = null;
+
+export async function retrieveDisruptions() {
+    try {
+        const disruptionResponse = await queryDisruptionAPI();
+        const disruptions = await parseDisruptionResponse(disruptionResponse);
+
+        if (disruptions.length === 0) {
+            throw new Error(`No disruption data available.`);
+        }
+
+        lastFetchTime = new Date();
+        console.log(`New disruption data fetched at ${lastFetchTime.toISOString()}`);
+        cachedDisruptionData = disruptions;
+        return disruptions;
+    } catch (error) {
+        if (cachedDisruptionData && cachedDisruptionData.length > 0) {
+            // Use cached data if available
+            return cachedDisruptionData;
+        }
+        return [];
+    }
+}
 
 async function queryDisruptionAPI() {
     const url = 'https://api.tfl.gov.uk/Line/Mode/tube/Status';
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), DISRUPTION_FETCH_TIMEOUT_MS);
+    const timeoutController = new AbortController();
+    const timeout = setTimeout(() => timeoutController.abort(), DISRUPTION_FETCH_TIMEOUT_IN_SECONDS * 1000); // Timeout for fetch request
     try {
         const response = await fetch(url, {
             method: 'GET',
@@ -19,66 +48,41 @@ async function queryDisruptionAPI() {
                 'Cache-Control': 'no-cache',
                 'app_key': API_KEY,
             },
-            signal: controller.signal,
+            signal: timeoutController.signal,
         });
         clearTimeout(timeout);
 
         if (!response.ok) {
-            const err = new Error(`Disruption API failed with status ${response.status}`);
-            console.error(err);
-            throw err;
+            throw new Error(`Disruption API failed with ${response.status}`);
         }
 
-        const data = response.json();
-        console.log(`Disruption fetched at ${new Date()}`);
+        const data = await response.json();
         return data;
-    } catch (error) {
+    } catch (error: any) {
         clearTimeout(timeout);
-        console.error('Error fetching disruptions:', error);
+        const isAborted = (timeoutController.signal.aborted || error?.name === 'AbortError');
+        const isNetworkError = (error instanceof Error && error.message === 'Network request failed');
+
+        if (isAborted || isNetworkError) {
+            if (isAborted) {
+                console.warn('Disruption fetch aborted (timeout).');
+            } else {
+                console.warn('Disruption fetch failed: Network request failed.');
+            }
+            return;
+        }
         throw error;
     }
-}
-export type disruptionEvent = {
-    lineName: string;
-    lineId: number;
-    status: string;
-    severity: number;
-    reason: string;
-    timeDelay: number | null;
-};
-const severityLevelTime: { [severity: number]: number } = {
-    // Convert TFL severity levels to estimated delay times in minutes
-    10: 0,   // Good Service
-    9: 5,   // Minor Delays
-    6: 20,  // Severe Delays
-    5: 30,  // Part Suspended
-}
-let cachedDisruptionData: Array<disruptionEvent> | null = null;
-let lastFetchTime: Date | null = null;
-
-
-export async function fetchDisruptionTimeForLine(lineId: number): Promise<number> {
-    if (!cachedDisruptionData) {
-        return 0;
-    }
-    const disruptionEvent = cachedDisruptionData.find(event => event.lineId === lineId);
-    if (!disruptionEvent) {
-        return 0;
-    }
-    const lineSeverityCode = disruptionEvent.severity;
-    const disruptionTime = severityLevelTime[lineSeverityCode];
-    return disruptionTime || 0;
 }
 
 async function parseDisruptionResponse(data: any[]): Promise<Array<disruptionEvent>> {
     if (!data) {
-        console.log('No disruption data available.');
         return [];
     }
     try {
         const disruptions: Array<disruptionEvent> = [];
         for (const disruption of data) {
-            const disruptionLineId = await Database.retrieveLineId(disruption.name);
+            const disruptionLineId = await tubeDatabase.retrieveLineId(disruption.name);
             const disruptionSeverity = disruption.lineStatuses[0].statusSeverity;
             const disruptionTime = severityLevelTime[disruptionSeverity];
             const disruptionEvent: disruptionEvent = {
@@ -93,34 +97,23 @@ async function parseDisruptionResponse(data: any[]): Promise<Array<disruptionEve
         }
         return disruptions;
     } catch (error) {
-        console.error('Error retrieving disruptions:', error);
+        console.error('Error parsing disruptions:', error);
         throw error;
     }
 }
 
-export function getLastDisruptionFetchTime(): Date | null {
-    return lastFetchTime;
+export function fetchDisruptionTimeForLine(lineId: number | null): number {
+    if (!cachedDisruptionData || lineId === null) {
+        return 0;
+    }
+    for (const disruption of cachedDisruptionData) {
+        if (disruption.lineId === lineId) {
+            return disruption.timeDelay || 0;
+        }
+    }
+    return 0;
 }
 
-export async function retrieveDisruptions() {
-    try {
-        const disruptionResponse = await queryDisruptionAPI();
-        const disruptions = await parseDisruptionResponse(disruptionResponse);
-
-        if (disruptions.length === 0) {
-            console.log(`No disruption data available at ${new Date()}`);
-            return [];
-        }
-
-        lastFetchTime = new Date();
-        cachedDisruptionData = disruptions;
-        return disruptions;
-    } catch (error) {
-        console.warn('Failed to fetch disruption from API:', error);
-        if (cachedDisruptionData && cachedDisruptionData.length > 0) {
-            // Use cached data if available
-            return cachedDisruptionData;
-        }
-        return [];
-    }
+export function getLastDisruptionFetchTime(): Date | null {
+    return lastFetchTime;
 }

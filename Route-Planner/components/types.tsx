@@ -1,20 +1,54 @@
-
-
 export type station = {
-    stationId: number;
-    stationName: string;
+    id: number;
+    name: string;
+    fromLineName?: string | null;
+    toLineName?: string | null;
+    latitude?: number;
+    longitude?: number;
 };
-export type pathKey = {
+export type neighbourStation = {
+    neighbourStationId: number;
+    lineId: number | null;
+    travelTime: number;
+};
+export type segmentKey = {
     fromStationId: number;
     toStationId: number;
-    fromStationName: string;
-    toStationName: string;
+    fromStationName?: string;
+    toStationName?: string;
 };
-
-export type pathFinderResult = {
+export type routeKey = {
+    fromStationId: number;
+    toStationId: number;
+};
+export type optimalRouteResult = {
     optimalStationSequence: number[];
     optimizedLineSequence: number[];
-    totalTime: number;
+    totalTravelTime: number;
     stationLinePairsEvaluated: number;
     stationLinePairsInQueue: number;
+};
+export type coordinate = {
+    longitude: number;
+    latitude: number;
+};
+export type coordinateRange = {
+    minLongitude: number;
+    minLatitude: number;
+    maxLongitude: number;
+    maxLatitude: number;
+};
+export type searchHistoryEntry = {
+    fromStationName: string;
+    toStationName: string;
+    fromStationId: number;
+    toStationId: number;
+};
+export type disruptionEvent = {
+    lineName: string;
+    lineId: number;
+    status: string;
+    severity: number;
+    reason: string;
+    timeDelay: number;
 };

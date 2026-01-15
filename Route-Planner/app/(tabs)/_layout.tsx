@@ -11,7 +11,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
-  const iconColor = '#811616';
+
   return (
     <RouteProvider> {/* Provides route context to all tabs */}
       <Tabs

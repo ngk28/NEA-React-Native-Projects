@@ -1,10 +1,11 @@
 import SQLite from 'react-native-sqlite-storage';
-import { Database } from './database';
+import { tubeDatabase } from './tubeDatabase';
+import { searchHistoryEntry } from './types';
 
 SQLite.enablePromise(true);
+const MAX_HISTORY_ENTRIES = 15;
 
 let databaseInstance: SQLite.SQLiteDatabase | null = null;
-
 
 async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
     if (databaseInstance) {
@@ -19,13 +20,8 @@ async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
         throw error;
     }
 }
-export type searchHistoryEntry = {
-    fromStationName: string;
-    toStationName: string;
-    fromStationId: number;
-    toStationId: number;
-};
-export async function clearSearchHistory(): Promise<void> {
+
+export async function deleteSearchHistory(): Promise<void> {
     const db = await openDatabase();
     const deleteQuery = `
         DELETE FROM searchHistory;
@@ -37,7 +33,7 @@ export async function clearSearchHistory(): Promise<void> {
         throw error;
     }
 }
-const MAX_RESPONSES = 15;
+
 export async function retrieveSearchHistory(): Promise<Array<searchHistoryEntry>> {
     const db = await openDatabase();
     const query = `
@@ -49,14 +45,16 @@ export async function retrieveSearchHistory(): Promise<Array<searchHistoryEntry>
         const [response] = await db.executeSql(query);
         const result = response.rows;
         const history: Array<searchHistoryEntry> = [];
-        for (let i = 0; i < Math.min(result.length, MAX_RESPONSES); i++) {
-            const fromStationName = await Database.retrieveStationName(result.item(i).fromStationId);
-            const toStationName = await Database.retrieveStationName(result.item(i).toStationId);
+        for (let i = 0; i < Math.min(result.length, MAX_HISTORY_ENTRIES); i++) {
+            const fromStationId = result.item(i).fromStationId;
+            const toStationId = result.item(i).toStationId;
+            const fromStationName = await tubeDatabase.retrieveStationName(fromStationId);
+            const toStationName = await tubeDatabase.retrieveStationName(toStationId);
             const searchEvent = {
                 fromStationName,
                 toStationName,
-                fromStationId: result.item(i).fromStationId,
-                toStationId: result.item(i).toStationId,
+                fromStationId: fromStationId,
+                toStationId: toStationId,
             }
             history.push(searchEvent);
         }
@@ -67,6 +65,16 @@ export async function retrieveSearchHistory(): Promise<Array<searchHistoryEntry>
     }
 }
 
+export async function logSearchHistory(fromStationId: number, toStationId: number) {
+    const db = await openDatabase();
+    const repeatedSearch = await isSearchAlreadyInHistory(fromStationId, toStationId);
+    if (repeatedSearch) {
+        await changeSearchTimestamp(fromStationId, toStationId);
+        return;
+    } else {
+        await enterSearchInHistory(fromStationId, toStationId);
+    }
+}
 
 async function isSearchAlreadyInHistory(fromStationId: number, toStationId: number): Promise<boolean> {
     const db = await openDatabase();
@@ -85,16 +93,6 @@ async function isSearchAlreadyInHistory(fromStationId: number, toStationId: numb
         throw error;
     }
 }
-export async function logSearchHistory(fromStationId: number, toStationId: number) {
-    const db = await openDatabase();
-    const repeatedSearch = await isSearchAlreadyInHistory(fromStationId, toStationId);
-    if (repeatedSearch) {
-        await changeSearchTimestamp(fromStationId, toStationId);
-        return;
-    } else {
-        await enterSearchInHistory(fromStationId, toStationId);
-    }
-}
 
 async function enterSearchInHistory(fromStationId: number, toStationId: number): Promise<void> {
     const db = await openDatabase();
@@ -110,6 +108,7 @@ async function enterSearchInHistory(fromStationId: number, toStationId: number):
         throw error;
     }
 }
+
 async function changeSearchTimestamp(fromStationId: number, toStationId: number): Promise<void> {
     const db = await openDatabase();
     const timestamp = new Date().toISOString();
@@ -125,15 +124,34 @@ async function changeSearchTimestamp(fromStationId: number, toStationId: number)
         throw error;
     }
 }
+
 export async function cleanUpSearchHistory(): Promise<void> {
     const count = await getSearchHistoryCount();
-    if (count <= MAX_RESPONSES) {
+    if (count <= MAX_HISTORY_ENTRIES) {
         return;
     }
-    const entriesToDelete = count - MAX_RESPONSES;
+    const entriesToDelete = count - MAX_HISTORY_ENTRIES;
     await deleteOldestSearch(entriesToDelete);
     return;
 }
+
+async function getSearchHistoryCount(): Promise<number> {
+    const countQuery = `
+    SELECT COUNT(*) as count
+    FROM searchHistory;
+    `;
+    const db = await openDatabase();
+    try {
+        const [response] = await db.executeSql(countQuery);
+        const result = response.rows;
+        const count = result.item(0).count;
+        return count;
+    } catch (error) {
+        console.error('Failed to get search history count:', error);
+        throw error;
+    }
+}
+
 async function deleteOldestSearch(entriesToDelete: number): Promise<void> {
     const db = await openDatabase();
     const deleteQuery = `
@@ -149,34 +167,6 @@ async function deleteOldestSearch(entriesToDelete: number): Promise<void> {
         await db.executeSql(deleteQuery, [entriesToDelete]);
     } catch (error) {
         console.error('Failed to clean up search history:', error);
-        throw error;
-    }
-}
-async function getSearchHistoryCount(): Promise<number> {
-    const db = await openDatabase();
-    const countQuery = `
-        SELECT COUNT(*) as count
-        FROM searchHistory;
-    `;
-    try {
-        const [response] = await db.executeSql(countQuery);
-        const result = response.rows;
-        const count = result.item(0).count;
-        return count;
-    } catch (error) {
-        console.error('Failed to get search history count:', error);
-        throw error;
-    }
-}
-export async function deleteSearchHistory(): Promise<void> {
-    const db = await openDatabase();
-    const deleteQuery = `
-        DELETE FROM searchHistory;
-    `;
-    try {
-        await db.executeSql(deleteQuery);
-    } catch (error) {
-        console.error('Failed to delete all searches:', error);
         throw error;
     }
 }

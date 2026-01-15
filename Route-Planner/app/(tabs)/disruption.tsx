@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-
-import { disruptionEvent, getLastDisruptionFetchTime, retrieveDisruptions } from '@/components/disruptionAPI';
+import { disruptionEvent } from '@/components/types';
+import { getLastDisruptionFetchTime, retrieveDisruptions } from '@/components/disruptionAPI';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 
@@ -16,7 +16,7 @@ export default function DisruptionScreen() {
     try {
       setLoading(true);
       const data = await retrieveDisruptions();
-      const fetchTime = await getLastDisruptionFetchTime();
+      const fetchTime = getLastDisruptionFetchTime();
       if (fetchTime === lastUpdated) { // No new fetch data
         setFetchError(true);
         setLoading(false);
@@ -37,9 +37,9 @@ export default function DisruptionScreen() {
   useEffect(() => {
     fetchDisruptions();
 
-    // Timer calling run every 60 seconds
-    const TIME_BETWEEN_FETCHES = 60; // seconds
-    const intervalId = setInterval(fetchDisruptions, TIME_BETWEEN_FETCHES * 1000);
+    // Timer to fetch disruption every 60 seconds
+    const TIME_BETWEEN_FETCHES_IN_SECONDS = 60;
+    const intervalId = setInterval(fetchDisruptions, TIME_BETWEEN_FETCHES_IN_SECONDS * 1000);
 
     return () => {
       clearInterval(intervalId); // Reset timer
@@ -61,6 +61,9 @@ export default function DisruptionScreen() {
       <ThemedText type="subtitle">Tube Line Disruptions</ThemedText>
       {lastUpdated && (
         <ThemedText type="default" style={styles.updated}>Last updated: {lastUpdated.toLocaleTimeString()}</ThemedText>
+      )}
+      {!lastUpdated && !loading && (
+        <ThemedText type="default" style={styles.updated}>No disruption data available.</ThemedText>
       )}
       <FlatList
         data={disruptions}
