@@ -2,14 +2,12 @@ import { retrieveDisruptions } from '@/components/disruptionAPI';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { retrieveOptimalRoute } from '@/components/pathFinder';
 import { logSearchHistory } from '@/components/searchHistoryManager';
-import { ThemedText } from '@/components/themed-text';
 import { tubeDatabase } from '@/components/tubeDatabase';
 import { station } from '@/components/types';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { useRoute } from '@/contexts/RouteContext';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
-import { Button, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Button, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function SearchScreen() {
   const { setRoute, path: selectedPath, setPath } = useRoute();
@@ -99,10 +97,9 @@ export default function SearchScreen() {
     console.log('Finding path from', selectedStart.name, 'to', selectedDestination.name);
     try {
       const optimalRoute = await retrieveOptimalRoute(selectedStart.id, selectedDestination.id);
-      const cached = optimalRoute;
-      setRoute(cached);
+      setRoute(optimalRoute);
       await logSearchHistory(selectedStart.id, selectedDestination.id);
-      console.log('Optimal route found:', cached);
+      console.log('Optimal route found:', optimalRoute);
       router.push('/(tabs)/map');
     } catch (error) {
       console.error('Failed to retrieve shortest path:', error);
@@ -113,15 +110,13 @@ export default function SearchScreen() {
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
       headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
+        <Image
+          source={require('../../assets/stationBanner.jpg')}
           style={styles.headerImage}
         />
       }>
 
-      <ThemedText>Choose stations to plan a route.</ThemedText>
+      <Text style={styles.title}>Choose stations to plan a route.</Text>
 
       {/* Starting station input and suggestions */}
       <View style={styles.inputFieldContainer}>
@@ -196,13 +191,12 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   headerImage: {
     color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+    resizeMode: 'none',
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
   },
   inputFieldContainer: {
     marginBottom: 16,
