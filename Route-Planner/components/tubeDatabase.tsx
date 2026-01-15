@@ -192,7 +192,7 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<neigh
         for (let i = 0; i < result.length; i++) {
             const row = result.item(i);
             const neighbourStation: neighbourStation = {
-                neighbourStationId: row.toStationId,
+                stationId: row.toStationId,
                 lineId: row.lineId,
                 travelTime: row.travelTime
             };
@@ -205,9 +205,8 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<neigh
     }
 }
 
-async function retrieveTransferTime(stationId: number, fromLineId: number | null, toLineId: number | null): Promise<number> {
+async function retrieveTransferTime(stationId: number, fromLineId: number, toLineId: number): Promise<number> {
     // If starting a journey (no incoming line), there is no transfer time
-    if (fromLineId === null || toLineId === null) return 0;
     // Try one way first: fromLineId -> toLineId
     const directQuery = `
         SELECT transferTime

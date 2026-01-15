@@ -7,7 +7,7 @@ export type station = {
     longitude?: number;
 };
 export type neighbourStation = {
-    neighbourStationId: number;
+    stationId: number;
     lineId: number | null;
     travelTime: number;
 };

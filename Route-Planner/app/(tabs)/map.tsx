@@ -1,6 +1,6 @@
 import { retrieveDisruptions } from '@/components/disruptionAPI';
 import { buildRouteGeoJSON, calculateBoundaryCoordinates } from '@/components/jsonManager';
-import { generateStationLineList, generateTransferStationList } from '@/components/pathFinder';
+import { generateStationLineList, generateTransferStationList, setCachedPath } from '@/components/pathFinder';
 import { disruptionEvent, station } from '@/components/types';
 import { useRoute } from '@/contexts/RouteContext';
 import Mapbox from "@rnmapbox/maps";
@@ -249,7 +249,7 @@ export default function MapScreen() {
                             <TouchableOpacity onPress={() => setExpandedPopupVisible(!expandedPopupVisible)} style={styles.expandButton}>
                                 <Text style={styles.expandButtonText}>{expandedPopupVisible ? 'Collapse' : 'Show all stations'}</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => { setPopupVisible(false); }} style={styles.closeButton}>
+                            <TouchableOpacity onPress={() => { setPopupVisible(false); setExpandedPopupVisible(false); }} style={styles.closeButton}>
                                 <Text style={styles.closeButtonText}>Close</Text>
                             </TouchableOpacity>
                         </View>

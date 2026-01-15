@@ -79,6 +79,10 @@ export class PriorityQueue<T> {
         return item;
     }
 
+    public emptyQueue() {
+        this.items = new Array<queueElement<T>>();
+    }
+
     // Move newly added element to its correct position higher in tree
     private heapifyUp() {
         let index = this.items.length - 1;
