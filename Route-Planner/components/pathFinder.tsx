@@ -9,12 +9,12 @@ let cachedRouteKey: routeKey | null = null;
 let cachedPathStationDetails: Array<station> | null = null;
 
 // Converts latitude and longitude to distance in kilometres using the Haversine formula
-function HaversineDistance(latitude1: number, longitude1: number, latitude2: number, longitude2: number): number {
+function HaversineDistance(coordinate1: coordinate, coordinate2: coordinate): number {
     const EARTH_RADIUS = 6371e3;
-    const theta1 = latitude1 * Math.PI / 180;
-    const theta2 = latitude2 * Math.PI / 180;
-    const deltaTheta = (latitude2 - latitude1) * Math.PI / 180;
-    const deltaLambda = (longitude2 - longitude1) * Math.PI / 180;
+    const theta1 = coordinate1.latitude * Math.PI / 180;
+    const theta2 = coordinate2.latitude * Math.PI / 180;
+    const deltaTheta = (coordinate2.latitude - coordinate1.latitude) * Math.PI / 180;
+    const deltaLambda = (coordinate2.longitude - coordinate1.longitude) * Math.PI / 180;
 
     const a = Math.sin(deltaTheta / 2) * Math.sin(deltaTheta / 2) +
         Math.cos(theta1) * Math.cos(theta2) *
@@ -23,12 +23,6 @@ function HaversineDistance(latitude1: number, longitude1: number, latitude2: num
     const distanceMetres = EARTH_RADIUS * c;
     const distanceKilometres = distanceMetres / 1000;
     return distanceKilometres;
-}
-
-export function setCachedPath(path: optimalRouteResult) {
-    if (cachedOptimalRoute === null) {
-        cachedOptimalRoute = path;
-    }
 }
 
 // Get cached path without recomputation, catches null error (for all functions calling it) if no cached path
@@ -76,15 +70,7 @@ export async function generateStationLineList() {
     const stationNames = await formatStationAsNames(stationSequence);
     const lineSequence = route.optimizedLineSequence;
 
-    const stationOnPathDetails: Array<station> = [];
-    for (let i = 0; i < stationSequence.length; i++) {
-        const stationDetail: station = {
-            id: stationSequence[i],
-            name: stationNames[i],
-        };
-        stationOnPathDetails.push(stationDetail);
-    }
-
+    const stationOnPathDetails: Array<station> = await createStationDetail(stationNames, stationSequence);
     await addLineNamesToStation(stationOnPathDetails, lineSequence, stationSequence); // Pass by reference
     await addCoordinatesToStation(stationOnPathDetails); // Pass by reference
 
@@ -96,6 +82,18 @@ export async function generateTransferStationList(): Promise<Array<station>> {
     const stationDetails = await generateStationLineList();
     const transferStations = stationDetails.filter((station) => station.fromLineName !== station.toLineName);
     return transferStations;
+}
+
+async function createStationDetail(stationNames: Array<string>, stationSequence: Array<number>): Promise<Array<station>> {
+    const stations: Array<station> = [];
+    for (let i = 0; i < stationSequence.length; i++) {
+        const stationDetail: station = {
+            id: stationSequence[i],
+            name: stationNames[i],
+        };
+        stations.push(stationDetail);
+    }
+    return stations;
 }
 
 async function addLineNamesToStation(stationDetails: Array<station>, lineSequence: Array<number>, stationSequence: Array<number>) {
@@ -179,7 +177,7 @@ export async function retrieveOptimalRoute(fromStationId: number, toStationId: n
 // Check if line delay has already been applied on the current path
 function doesPathContainsLine(previousNodeMap: Map<string, string | null>, stationLineKey: string, neighbourLine: number | null): boolean {
     if (neighbourLine === null) {
-        return true;
+        return false;
     }
     let currentKey: string | null = stationLineKey;
     while (currentKey !== null) {
@@ -211,6 +209,7 @@ function reconstructPath(previous: Map<string, string | null>, stationLineKey: s
 }
 
 
+
 // A* Search Algorithm Implementation
 // Nodes kept as string "stationId-lineId" to differentiate between same station on different lines
 // Must be string for map to work properly
@@ -222,85 +221,58 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
     const toStationCoordinate: coordinate = await tubeDatabase.retrieveStationCoordinate(toStationId);
     const fromStationCoordinate: coordinate = await tubeDatabase.retrieveStationCoordinate(fromStationId);
 
-    // Heuristics: Use real-life distance to estimate approximate time from start to destination
-    var estimatedCost = HaversineDistance(fromStationCoordinate.latitude, fromStationCoordinate.longitude, toStationCoordinate.latitude, toStationCoordinate.longitude);
-
     // Initialize start state being from any line
     const startStateKey = `${fromStationId}-null`;
     previousNodeMap.set(startStateKey, null);
     optimalTime.set(startStateKey, 0);
+    var estimatedTravelTime = HaversineDistance(fromStationCoordinate, toStationCoordinate); // Heuristics: Use real-life distance to estimate approximate time from start to destination
     const startingStation: neighbourStation = {
         stationId: fromStationId,
-        travelTime: estimatedCost,
+        travelTime: estimatedTravelTime,
         lineId: null
     }
-    priorityQueue.enqueue(startingStation, estimatedCost);
+    priorityQueue.enqueue(startingStation, estimatedTravelTime);
 
     while (priorityQueue.size() > 0) {
-        const current = priorityQueue.dequeue()!;
+        const currentNode = priorityQueue.dequeue()!;
 
         // Skip if already processed this exact station-line combination
-        const currentStationLineKey = `${current.stationId}-${current.lineId}`;
+        const currentStationLineKey = `${currentNode.stationId}-${currentNode.lineId}`;
         if (visitedNodes.has(currentStationLineKey)) {
             continue;
         }
         visitedNodes.add(currentStationLineKey);
 
         // Optimal path found and exit
-        if (current.stationId === toStationId) {
-            const stationLinePairsEvaluated = visitedNodes.size;
-            const stationLinePairsInQueue = priorityQueue.size();
-            const shortestPath = reconstructPath(previousNodeMap, currentStationLineKey);
-            const shortestPathStations = shortestPath.stationPath;
-            const shortestPathLines = shortestPath.linePath;
-            const totalTime = optimalTime.get(currentStationLineKey)!;
-            return { optimalStationSequence: shortestPathStations, optimizedLineSequence: shortestPathLines, totalTravelTime: totalTime, stationLinePairsEvaluated, stationLinePairsInQueue };
+        if (currentNode.stationId === toStationId) {
+            const optimalRoute = createOptimalRouteOutput(currentStationLineKey);
+            return optimalRoute;
         }
 
-        const neighbours = await tubeDatabase.retrieveNeighbourStations(current.stationId);
-
+        const neighbours = await tubeDatabase.retrieveNeighbourStations(currentNode.stationId);
         for (const neighbour of neighbours) {
-            const station = neighbour.stationId;
-            const line = neighbour.lineId;
 
             // Skip if already visited this specific station-line combination
-            const neighbourStationLineKey = `${station}-${line}`;
+            const neighbourStationLineKey = `${neighbour.stationId}-${neighbour.lineId}`;
             if (visitedNodes.has(neighbourStationLineKey)) {
                 continue;
             }
 
-            // Calculate future time/distance to destination
-            const neighbourCoordinate: coordinate = await tubeDatabase.retrieveStationCoordinate(station);
-            const estimateFutureTime = HaversineDistance(neighbourCoordinate.latitude, neighbourCoordinate.longitude, toStationCoordinate.latitude, toStationCoordinate.longitude);
-            // Only adds disruption delay for a given line once per route
-            var disruptionDelay = 0;
-            if (doesPathContainsLine(previousNodeMap, currentStationLineKey, line)) {
-                const delayTime = fetchDisruptionTimeForLine(line);
-                disruptionDelay += delayTime;
-            }
-
-            // Current distance travelled + travel time to neighbour + disruption delay (no heuristics) 
-            var calculatedTravelTime = optimalTime.get(currentStationLineKey)! + neighbour.travelTime + disruptionDelay;
+            const neighbourCoordinate: coordinate = await tubeDatabase.retrieveStationCoordinate(neighbour.stationId);
+            const estimateFutureTime = HaversineDistance(neighbourCoordinate, toStationCoordinate);
 
             // If interchange, add transfer time (if not walking connection which is a transfer itself)
-            const WALKING_CONNECTION_LINE_ID = 12;
-            if (current.lineId !== null && line !== current.lineId) {
-                if (!(current.lineId === WALKING_CONNECTION_LINE_ID || line === WALKING_CONNECTION_LINE_ID) && line !== null) {
-                    try {
-                        const transferTime = await tubeDatabase.retrieveTransferTime(current.stationId, current.lineId, line);
-                        calculatedTravelTime += transferTime;
-                    } catch (error) {
-                        console.error('Error retrieving transfer time:', error);
-                    }
-                }
-            }
+            const transferTime = await calculateTransferTime(currentNode.stationId, currentNode.lineId, neighbour.lineId);
+            const disruptionDelay = await calculateDelayTime(currentNode.stationId, currentStationLineKey, neighbour.lineId);
+            // Current distance travelled + travel time to neighbour + disruption delay (no heuristics) 
+            var calculatedTravelTime = optimalTime.get(currentStationLineKey)! + neighbour.travelTime + disruptionDelay + transferTime;
 
             // New estimated time = tentative time + heuristic estimate to goal
             var newEstimatedTime = calculatedTravelTime + estimateFutureTime;
             const newNeighbourStation: neighbourStation = {
-                stationId: station,
+                stationId: neighbour.stationId,
                 travelTime: newEstimatedTime,
-                lineId: line
+                lineId: neighbour.lineId
             }
             priorityQueue.enqueue(newNeighbourStation, newEstimatedTime);
             if (!optimalTime.has(neighbourStationLineKey) || calculatedTravelTime < optimalTime.get(neighbourStationLineKey)!) {
@@ -309,6 +281,52 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
             }
         }
     }
+
+    async function calculateDelayTime(stationId: number, currentStationLineKey: string, line: number | null): Promise<number> {
+        // Only adds disruption delay for a given line once per route
+        if (line === null) {
+            return 0;
+        }
+        var disruptionDelay = 0;
+        if (doesPathContainsLine(previousNodeMap, currentStationLineKey, line)) {
+            const delayTime = fetchDisruptionTimeForLine(line);
+            disruptionDelay += delayTime;
+        }
+        return disruptionDelay;
+    }
+
+    async function calculateTransferTime(stationId: number, currentLineId: number | null, connectingLineId: number | null): Promise<number> {
+        const WALKING_CONNECTION_LINE_ID = 12;
+        let transferTime = 0;
+        if (currentLineId !== null && connectingLineId !== currentLineId) {
+            if (!(currentLineId === WALKING_CONNECTION_LINE_ID || connectingLineId === WALKING_CONNECTION_LINE_ID) && connectingLineId !== null) {
+                try {
+                    transferTime = await tubeDatabase.retrieveTransferTime(stationId, currentLineId, connectingLineId);
+                } catch (error) {
+                    console.error('Error retrieving transfer time:', error);
+                }
+            }
+        }
+        return transferTime;
+    }
+
+    function createOptimalRouteOutput(destinationStationLineKey: string): optimalRouteResult {
+        const stationLinePairsEvaluated = visitedNodes.size;
+        const stationLinePairsInQueue = priorityQueue.size();
+        const shortestPath = reconstructPath(previousNodeMap, destinationStationLineKey);
+        const shortestPathStations = shortestPath.stationPath;
+        const shortestPathLines = shortestPath.linePath;
+        const totalTime = optimalTime.get(destinationStationLineKey)!;
+        const optimalRoute: optimalRouteResult = {
+            optimalStationSequence: shortestPathStations,
+            optimizedLineSequence: shortestPathLines,
+            totalTravelTime: totalTime,
+            stationLinePairsEvaluated: stationLinePairsEvaluated,
+            stationLinePairsInQueue: stationLinePairsInQueue
+        };
+        return optimalRoute;
+    }
+
     return { optimalStationSequence: [], optimizedLineSequence: [], totalTravelTime: Infinity, stationLinePairsEvaluated: 0, stationLinePairsInQueue: 0 };
 }
 

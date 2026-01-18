@@ -5,6 +5,7 @@ SQLite.enablePromise(true);
 
 let databaseInstance: SQLite.SQLiteDatabase | null = null;
 const DEFAULT_TRANSFER_PENALTY_IN_MINUTES = 4;
+const FILE_NAME = 'tubeInformation.db'
 
 export interface tubeDatabase {
     openDatabase(): Promise<SQLite.SQLiteDatabase>;
@@ -33,7 +34,7 @@ export const tubeDatabase: tubeDatabase = {
 async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
     if (databaseInstance) return databaseInstance;
     try {
-        const db = await SQLite.openDatabase({ name: 'LondonUndergroundTestV8.db', createFromLocation: 1, readOnly: true });
+        const db = await SQLite.openDatabase({ name: FILE_NAME, createFromLocation: 1, readOnly: true });
         databaseInstance = db;
         return db;
     } catch (error) {

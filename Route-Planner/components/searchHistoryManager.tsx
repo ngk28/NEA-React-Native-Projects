@@ -4,6 +4,7 @@ import { searchHistoryEntry } from './types';
 
 SQLite.enablePromise(true);
 const MAX_HISTORY_ENTRIES = 15;
+const FILE_NAME = 'searchHistory.db'
 
 let databaseInstance: SQLite.SQLiteDatabase | null = null;
 
@@ -12,7 +13,7 @@ async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
         return databaseInstance;
     }
     try {
-        const db = await SQLite.openDatabase({ name: 'searchHistoryV2.db', createFromLocation: 1 });
+        const db = await SQLite.openDatabase({ name: FILE_NAME, createFromLocation: 1 });
         databaseInstance = db;
         return db;
     } catch (error) {

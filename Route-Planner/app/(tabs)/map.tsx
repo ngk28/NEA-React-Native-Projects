@@ -1,6 +1,6 @@
 import { retrieveDisruptions } from '@/components/disruptionAPI';
 import { buildRouteGeoJSON, calculateBoundaryCoordinates } from '@/components/jsonManager';
-import { generateStationLineList, generateTransferStationList, setCachedPath } from '@/components/pathFinder';
+import { generateStationLineList, generateTransferStationList } from '@/components/pathFinder';
 import { disruptionEvent, station } from '@/components/types';
 import { useRoute } from '@/contexts/RouteContext';
 import Mapbox from "@rnmapbox/maps";

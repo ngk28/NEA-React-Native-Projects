@@ -96,11 +96,11 @@ export default function SearchScreen() {
 
     console.log('Finding path from', selectedStart.name, 'to', selectedDestination.name);
     try {
+      router.push('/(tabs)/map');
       const optimalRoute = await retrieveOptimalRoute(selectedStart.id, selectedDestination.id);
       setRoute(optimalRoute);
-      await logSearchHistory(selectedStart.id, selectedDestination.id);
       console.log('Optimal route found:', optimalRoute);
-      router.push('/(tabs)/map');
+      await logSearchHistory(selectedStart.id, selectedDestination.id);
     } catch (error) {
       console.error('Failed to retrieve shortest path:', error);
     }
