@@ -1,5 +1,5 @@
 import SQLite from 'react-native-sqlite-storage';
-import { coordinate, neighbourStation, station } from './types';
+import { adjacentStation, coordinate, station } from './types';
 
 SQLite.enablePromise(true);
 
@@ -16,7 +16,7 @@ export interface tubeDatabase {
     retrieveLineId(lineName: string): Promise<number>;
     retrieveLineName(lineId: number): Promise<string>;
     retrieveTransferTime(fromStationId: number, toStationId: number, lineId: number): Promise<number>;
-    retrieveNeighbourStations(stationId: number): Promise<Array<neighbourStation>>;
+    retrieveNeighbourStations(stationId: number): Promise<Array<adjacentStation>>;
 }
 
 export const tubeDatabase: tubeDatabase = {
@@ -179,7 +179,7 @@ async function retrieveLineName(lineId: number): Promise<string> {
     }
 }
 
-async function retrieveNeighbourStations(stationId: number): Promise<Array<neighbourStation>> {
+async function retrieveNeighbourStations(stationId: number): Promise<Array<adjacentStation>> {
     const command = `
         SELECT toStationId, lineId, travelTime
         FROM connections
@@ -189,10 +189,10 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<neigh
     try {
         const [response] = await db.executeSql(command, [stationId]);
         const result = response.rows;
-        const neighbourStations: Array<neighbourStation> = [];
+        const neighbourStations: Array<adjacentStation> = [];
         for (let i = 0; i < result.length; i++) {
             const row = result.item(i);
-            const neighbourStation: neighbourStation = {
+            const neighbourStation: adjacentStation = {
                 stationId: row.toStationId,
                 lineId: row.lineId,
                 travelTime: row.travelTime

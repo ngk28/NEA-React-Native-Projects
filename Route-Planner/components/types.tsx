@@ -6,10 +6,10 @@ export type station = {
     latitude?: number;
     longitude?: number;
 };
-export type neighbourStation = {
+export type adjacentStation = {
     stationId: number;
     lineId: number | null;
-    travelTime: number;
+    travelTime?: number | undefined;
 };
 export type segmentKey = {
     fromStationId: number;
