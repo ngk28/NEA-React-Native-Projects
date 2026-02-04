@@ -11,20 +11,25 @@ let cachedRouteKey: routeKey | null = null;
 let cachedPathStationDetails: Array<station> | null = null;
 
 // Converts latitude and longitude to distance in kilometres using the Haversine formula
-function HaversineDistance(coordinate1: coordinate, coordinate2: coordinate): number {
-    const EARTH_RADIUS = 6371e3;
+function distanceBetweenCoordinates(coordinate1: coordinate, coordinate2: coordinate): number {
+    const EARTH_RADIUS_IN_METRES = 6371e3;
     const theta1 = coordinate1.latitude * Math.PI / 180;
     const theta2 = coordinate2.latitude * Math.PI / 180;
-    const deltaTheta = (coordinate2.latitude - coordinate1.latitude) * Math.PI / 180;
-    const deltaLambda = (coordinate2.longitude - coordinate1.longitude) * Math.PI / 180;
+    const deltaLat = (coordinate2.latitude - coordinate1.latitude) * Math.PI / 180;
+    const deltaLong = (coordinate2.longitude - coordinate1.longitude) * Math.PI / 180;
 
-    const a = Math.sin(deltaTheta / 2) * Math.sin(deltaTheta / 2) +
+    const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
         Math.cos(theta1) * Math.cos(theta2) *
-        Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+        Math.sin(deltaLong / 2) * Math.sin(deltaLong / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distanceMetres = EARTH_RADIUS * c;
+    const distanceMetres = EARTH_RADIUS_IN_METRES * c;
     const distanceKilometres = distanceMetres / 1000;
     return distanceKilometres;
+}
+
+function calculateEstimatedTime(distanceInKilometres: number): number {
+    const MINUTES_FOR_KILOMETRE = 1.3; // Approximate average time in minutes to travel 1 kilometre on London Underground
+    return distanceInKilometres * MINUTES_FOR_KILOMETRE;
 }
 
 // Get cached path without recomputation, catches null error (for all functions calling it) if no cached path
@@ -72,7 +77,7 @@ export async function generateStationLineList() {
     const stationNames = await formatStationAsNames(stationSequence);
     const lineSequence = route.optimizedLineSequence;
 
-    const stationOnPathDetails: Array<station> = await createStationDetail(stationNames, stationSequence);
+    const stationOnPathDetails: Array<station> = createStationDetail(stationNames, stationSequence);
     await addLineNamesToStation(stationOnPathDetails, lineSequence, stationSequence); // Pass by reference
     await addCoordinatesToStation(stationOnPathDetails); // Pass by reference
 
@@ -86,7 +91,7 @@ export async function generateTransferStationList(): Promise<Array<station>> {
     return transferStations;
 }
 
-async function createStationDetail(stationNames: Array<string>, stationSequence: Array<number>): Promise<Array<station>> {
+function createStationDetail(stationNames: Array<string>, stationSequence: Array<number>): Array<station> {
     const stations: Array<station> = [];
     for (let i = 0; i < stationSequence.length; i++) {
         const stationDetail: station = {
@@ -214,8 +219,8 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
     const previousNode = new HashMap<adjacentStation, adjacentStation | null>();
     const optimalTime = new HashMap<adjacentStation, number>();
     let priorityQueue = new PriorityQueue<adjacentStation>();
-    const toStationCoordinate: coordinate = await tubeDatabase.retrieveStationCoordinate(toStationId);
     const fromStationCoordinate: coordinate = await tubeDatabase.retrieveStationCoordinate(fromStationId);
+    const toStationCoordinate: coordinate = await tubeDatabase.retrieveStationCoordinate(toStationId);
 
     // Initialize starting station
     const startingStation: adjacentStation = {
@@ -224,7 +229,8 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
     };
     previousNode.set(startingStation, null);
     optimalTime.set(startingStation, 0);
-    var estimatedTimeToDestination = HaversineDistance(fromStationCoordinate, toStationCoordinate); // Heuristics: Use real-life distance to estimate approximate time from start to destination
+    var estimatedTimeToDestination = calculateEstimatedTime(distanceBetweenCoordinates(fromStationCoordinate, toStationCoordinate)); // Heuristics: Use real-life distance to estimate approximate time from start to destination
+    // console.log(`Estimated time from starting station ID ${fromStationId} to destination: ${estimatedTimeToDestination.toFixed(2)} mins`);
     priorityQueue.enqueue(startingStation, estimatedTimeToDestination);
 
     while (priorityQueue.size() > 0) {
@@ -257,7 +263,8 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
 
             // Estimated remaining time - heuristic: Distance from neighbour to destination station using Haversine formula
             const neighbourCoordinate: coordinate = await tubeDatabase.retrieveStationCoordinate(neighbourStation.stationId);
-            const estimatedTimeToDestination = HaversineDistance(neighbourCoordinate, toStationCoordinate);
+            const estimatedTimeToDestination = calculateEstimatedTime(distanceBetweenCoordinates(neighbourCoordinate, toStationCoordinate));
+            console.log(`Estimated time from station ID ${neighbourStation.stationId} to destination: ${estimatedTimeToDestination.toFixed(2)} mins`);
 
             // Total travel time = Calculated time from start to neighbour station + Estimated time from neighbour to destination station
             var totalEstimatedTravelTime = calculatedTimeToNeighbour + estimatedTimeToDestination;
@@ -321,6 +328,3 @@ async function computeShortestPath(fromStationId: number, toStationId: number): 
 
     return { optimalStationSequence: [], optimizedLineSequence: [], totalTravelTime: Infinity, stationLinePairsEvaluated: 0, stationLinePairsInQueue: 0 };
 }
-
-
-

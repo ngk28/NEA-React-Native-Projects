@@ -17,6 +17,7 @@ export interface tubeDatabase {
     retrieveLineName(lineId: number): Promise<string>;
     retrieveTransferTime(fromStationId: number, toStationId: number, lineId: number): Promise<number>;
     retrieveNeighbourStations(stationId: number): Promise<Array<adjacentStation>>;
+    retrieveNeighbourStationsDebug(stationName: string): Promise<void>;
 }
 
 export const tubeDatabase: tubeDatabase = {
@@ -29,6 +30,7 @@ export const tubeDatabase: tubeDatabase = {
     retrieveLineName: retrieveLineName,
     retrieveTransferTime: retrieveTransferTime,
     retrieveNeighbourStations: retrieveNeighbourStations,
+    retrieveNeighbourStationsDebug: retrieveNeighbourStationsDebug,
 };
 
 async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
@@ -237,5 +239,33 @@ async function retrieveTransferTime(stationId: number, fromLineId: number, toLin
     } catch (error) {
         console.error('Error retrieving transfer time:', error);
         return DEFAULT_TRANSFER_PENALTY_IN_MINUTES;
+    }
+}
+
+async function retrieveNeighbourStationsDebug(stationName: string): Promise<void> {
+    const command = `
+        SELECT stations.stationName, lines.lineName, connections.travelTime
+        FROM connections
+        FULL JOIN stations
+        ON stations.stationId = connections.toStationId
+        FULL JOIN lines
+        ON connections.lineId = lines.lineId
+        WHERE fromStationId = (
+            SELECT stationId 
+            FROM stations
+            WHERE stationName = ?
+        );
+    `;
+    const db = await openDatabase();
+    try {
+        const [response] = await db.executeSql(command, [stationName]);
+        const result = response.rows;
+        for (let i = 0; i < result.length; i++) {
+            const row = result.item(i);
+            console.log(`Station: ${row.stationName}, Line: ${row.lineName}, Travel Time: ${row.travelTime} minutes`);
+        }
+    } catch (error) {
+        console.error('Error retrieving neighbour stations:', error);
+        throw error;
     }
 }

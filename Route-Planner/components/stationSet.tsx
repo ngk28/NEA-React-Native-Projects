@@ -15,6 +15,7 @@ export class StationSet<K extends adjacentStation> {
     public add(key: K) {
         this.stationLineKeys.add(this.makeKeyString(key));
     }
+
     public has(key: K): boolean {
         return this.stationLineKeys.has(this.makeKeyString(key));
     }
