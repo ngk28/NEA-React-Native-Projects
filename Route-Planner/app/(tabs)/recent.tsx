@@ -12,7 +12,7 @@ export default function RecentScreen() {
     const [recentSearches, setRecentSearches] = React.useState<Array<RouteQuery>>([]);
 
     // Route context for sharing selected path across pages
-    const { setPath, route } = useRoute();
+    const { setSelectedPath, routeResult } = useRoute();
 
     // Router for navigation between pages
     const router = useRouter();
@@ -36,7 +36,7 @@ export default function RecentScreen() {
             fromStationName: search.fromStationName,
             toStationName: search.toStationName,
         };
-        setPath(selectedPath);
+        setSelectedPath(selectedPath);
 
         // Navigate back to the Search tab (index)
         router.push('/');
@@ -59,7 +59,7 @@ export default function RecentScreen() {
 
         // Cleans up search history by removing old searches that exceed max history entries
         cleanUpSearchHistory();
-    }, [route]);
+    }, [routeResult]);
 
     return (
         <View style={styles.container}>

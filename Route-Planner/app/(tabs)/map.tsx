@@ -16,7 +16,7 @@ Mapbox.setTelemetryEnabled(false);
 
 export default function MapScreen() {
     // Route context allows optimal route to be shared across pages
-    const { route } = useRoute();
+    const { routeResult } = useRoute();
 
     // Stores offline map pack
     const [offlineMap, setOfflineMap] = useState<any | null>(null);
@@ -41,7 +41,7 @@ export default function MapScreen() {
     // Retreives route geometry (from GeoJSON) to display accurate path on map
     async function buildRouteGeometry() {
         try {
-            const routeGeometry = await generateRoutePolyline(route!);
+            const routeGeometry = await generateRoutePolyline(routeResult!);
             setRouteGeometry(routeGeometry);
             setPopupVisible(true);
         } catch (err) {
@@ -129,7 +129,7 @@ export default function MapScreen() {
     // Rebuilds train path and popup data when new route is searched
     useEffect(() => {
         // If no route found, resets map and hides popups
-        if (!route) {
+        if (!routeResult) {
             setRouteGeometry(null);
             setPopupVisible(false);
             return;
@@ -138,7 +138,7 @@ export default function MapScreen() {
         // If route found, builds route geometry and popup data
         buildRouteGeometry();
         buildPopupData();
-    }, [route]);
+    }, [routeResult]);
 
     // Adjusts camera to fit the route once train path is drawn
     useEffect(() => {
@@ -234,13 +234,13 @@ export default function MapScreen() {
             )}
 
             { /* Popup showing route details */}
-            {popupVisible && route && (
+            {popupVisible && routeResult && (
                 <View style={styles.routePopupContainer}>
                     <View style={styles.routePopupCard}>
                         {/* Shows travel time and route searched */}
                         <View style={styles.routePopupHeader}>
                             <Text style={styles.popupTitle}>Route</Text>
-                            <Text style={styles.popupTime}>{Math.round(route.totalTravelTime)} min</Text>
+                            <Text style={styles.popupTime}>{Math.round(routeResult.totalTravelTime)} min</Text>
                         </View>
                         {stationDetails.length > 0 && (
                             <View style={styles.routeSummary}>
@@ -321,7 +321,7 @@ export default function MapScreen() {
             )}
 
             { /* Button to re-open route popup */}
-            {!popupVisible && !selectedLineStatus && route && (
+            {!popupVisible && !selectedLineStatus && routeResult && (
                 <TouchableOpacity onPress={() => setPopupVisible(true)} style={styles.openPopupButton}>
                     <Text style={styles.openPopupButtonText}>Show Route</Text>
                 </TouchableOpacity>

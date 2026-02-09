@@ -16,7 +16,7 @@ export default function SearchScreen() {
   const router = useRouter();
 
   // Route context allows optimal route and selected route to be shared across pages without having to access cache or recalculate
-  const { setRoute, path: selectedPath, setPath } = useRoute();
+  const { setRouteResult, selectedPath, setSelectedPath } = useRoute();
 
   // Handles user's text inputs when searching for stations 
   const [startQuery, setStartQuery] = React.useState('');
@@ -60,7 +60,7 @@ export default function SearchScreen() {
     handleDestinationStationSelection(endStationFromHistory);
 
     // Clears selection so only applies transfer once
-    setPath(null);
+    setSelectedPath(null);
   }, [selectedPath]);
 
   // Searches for starting station suggestions when user types something in starting station text box
@@ -138,7 +138,7 @@ export default function SearchScreen() {
       const optimalRoute = await retrieveOptimalRoute(selectedStart.id, selectedDestination.id);
 
       // Updates route context with optimal route to display on map
-      setRoute(optimalRoute);
+      setRouteResult(optimalRoute);
       console.log('Optimal route found:', optimalRoute);
 
       // Logs journey into search history
