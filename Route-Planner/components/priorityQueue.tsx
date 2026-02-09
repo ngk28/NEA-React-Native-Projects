@@ -1,16 +1,20 @@
-class queueElement<T> {
+// Queue element class to store item and priority together in priority queue
+class QueueElement<T> {
     constructor(public item: T, public priority: number) {
         this.item = item;
         this.priority = priority;
     }
 }
-// Based on Min-Heap
+
+// Implementation of priority queue data structure using a min-heap for A* algorithm 
 // Lower priority number = higher priority in queue
 export class PriorityQueue<T> {
-    private items: Array<queueElement<T>>;
+    // Internal array to store queue elements as a binary tree
+    private items: Array<QueueElement<T>>;
 
+    // Initialises empty queue
     constructor() {
-        this.items = new Array<queueElement<T>>();
+        this.items = new Array<QueueElement<T>>();
     }
 
     public size(): number {
@@ -45,15 +49,15 @@ export class PriorityQueue<T> {
         return this.getParentIndex(index) >= 0;
     }
 
-    private returnLeftChild(index: number): queueElement<T> {
+    private returnLeftChild(index: number): QueueElement<T> {
         return this.items[this.getLeftChildIndex(index)];
     }
 
-    private returnRightChild(index: number): queueElement<T> {
+    private returnRightChild(index: number): QueueElement<T> {
         return this.items[this.getRightChildIndex(index)];
     }
 
-    private returnParent(index: number): queueElement<T> {
+    private returnParent(index: number): QueueElement<T> {
         return this.items[this.getParentIndex(index)];
     }
 
@@ -64,28 +68,41 @@ export class PriorityQueue<T> {
     }
 
     public enqueue(item: T, priority: number) {
-        this.items.push(new queueElement<T>(item, priority));
+        // Add new element to end of array
+        this.items.push(new QueueElement<T>(item, priority));
+
+        // Moves newly added element to its correct position higher in tree
         this.heapifyUp();
     }
 
+
     public dequeue(): T | null {
+        // If queue is empty, return null
         if (this.isEmpty()) {
             return null;
         }
-        const item = this.items[0].item;
+
+        // Stores item with highest priority at root
+        const root = this.items[0].item;
+
+        // Swap first and last element, remove last element (old root) from array
         this.items[0] = this.items[this.size() - 1];
         this.items.pop();
+
+        // Moves new root element to correct position lower in tree 
         this.heapifyDown();
-        return item;
+        return root;
     }
 
     public emptyQueue() {
-        this.items = new Array<queueElement<T>>();
+        this.items = new Array<QueueElement<T>>();
     }
 
     // Move newly added element to its correct position higher in tree
     private heapifyUp() {
         let index = this.items.length - 1;
+
+        // Loops up tree until root node or new element in correct position
         while (this.hasParent(index) && this.returnParent(index).priority > this.items[index].priority) {
             const parentIndex = this.getParentIndex(index);
             this.swap(parentIndex, index);
@@ -96,14 +113,21 @@ export class PriorityQueue<T> {
     // Move root element to correct position lower in tree after swapped from remove operation
     private heapifyDown() {
         let index = 0;
+
+        // Loops down tree until no children or root node in correct position
         while (this.hasLeftChild(index)) {
+            // Determines which child has higher priority (lower priority number) to swap with
             let smallerChildIndex = this.getLeftChildIndex(index);
             if (this.hasRightChild(index) && this.returnRightChild(index).priority < this.returnLeftChild(index).priority) {
                 smallerChildIndex = this.getRightChildIndex(index);
             }
+
+            // Parent node in order as smallest element is parent node
             if (this.items[index].priority < this.items[smallerChildIndex].priority) {
                 break;
             }
+
+            // Swap parent with smaller child and continue down tree
             this.swap(index, smallerChildIndex);
             index = smallerChildIndex;
         }

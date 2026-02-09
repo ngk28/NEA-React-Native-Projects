@@ -1,61 +1,78 @@
-import { cleanUpSearchHistory, deleteSearchHistory, retrieveSearchHistory } from '@/components/searchHistoryManager';
+import { fetchSearchHistory, cleanUpSearchHistory } from '@/components/searchHistory';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { searchHistoryEntry, segmentKey } from '@/components/types';
+import { RouteQuery } from '@/components/types';
 import { useRoute } from '@/contexts/RouteContext';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function RecentScreen() {
-    const [recentSearches, setRecentSearches] = React.useState<Array<searchHistoryEntry>>([]);
+    // State to hold recent search history entries
+    const [recentSearches, setRecentSearches] = React.useState<Array<RouteQuery>>([]);
+
+    // Route context for sharing selected path across pages
     const { setPath, route } = useRoute();
+
+    // Router for navigation between pages
     const router = useRouter();
 
+    // Fetches recent search history from database
     const fetchRecentSearches = async () => {
         try {
-            const searches = await retrieveSearchHistory();
+            const searches = await fetchSearchHistory();
             setRecentSearches(searches);
         } catch (error) {
             console.error('Error fetching recent searches:', error);
         }
     }
 
-    React.useEffect(() => {
-        fetchRecentSearches();
-        cleanUpSearchHistory(); // Clean up old entries to prevent overflow
-    }, [route]);
-
-    // Share selected path to search page
-    const handleSearchAgain = (search: searchHistoryEntry) => {
-        const selectedPath: segmentKey = {
+    // Handles search again button clicked for a search history entry
+    const handleSearchAgain = (search: RouteQuery) => {
+        // Shares selected past search/stations to search page
+        const selectedPath: RouteQuery = {
             fromStationId: search.fromStationId,
             toStationId: search.toStationId,
             fromStationName: search.fromStationName,
             toStationName: search.toStationName,
         };
         setPath(selectedPath);
-        router.push('/'); // Navigate back to the Search tab (index)
+
+        // Navigate back to the Search tab (index)
+        router.push('/');
     }
 
+    // Handles clear history button clicked
     const clearHistory = async () => {
         try {
-            await deleteSearchHistory();
+            await cleanUpSearchHistory();
             setRecentSearches([]);
         } catch (error) {
             console.error('Error clearing search history:', error);
         }
     }
 
+    // Handles new searches being added to search history
+    React.useEffect(() => {
+        // Updates searches shown on page (shows newly searched paths)
+        fetchRecentSearches();
+
+        // Cleans up search history by removing old searches that exceed max history entries
+        cleanUpSearchHistory();
+    }, [route]);
+
     return (
         <View style={styles.container}>
+            {/* Title for recent searches page */}
             <ThemedText type="subtitle" style={styles.title}>Recent Searches</ThemedText>
 
             <ScrollView contentContainerStyle={styles.scrollContent} style={{ width: '100%' }}>
+                {/* Message if no recent searches found */}
                 {recentSearches.length === 0 && (
                     <ThemedText type="default">No recent searches found.</ThemedText>
                 )}
 
+                {/* Displays every recent search with a button to search again */}
                 {recentSearches.map((search, index) => (
                     <ThemedView style={styles.card} key={index}>
                         <ThemedText type="default" style={styles.station}>{search.fromStationName} → {search.toStationName}</ThemedText>
@@ -66,6 +83,7 @@ export default function RecentScreen() {
                 ))}
             </ScrollView>
 
+            {/* Button to clear search history */}
             <TouchableOpacity onPress={() => clearHistory()} style={styles.deleteButton}>
                 <Text style={styles.deleteButtonText}>Clear Search History</Text>
             </TouchableOpacity>

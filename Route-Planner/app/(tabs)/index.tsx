@@ -1,41 +1,51 @@
-import { retrieveDisruptions } from '@/components/disruptionAPI';
 import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { retrieveOptimalRoute } from '@/components/pathFinder';
-import { logSearchHistory } from '@/components/searchHistoryManager';
+import { retrieveOptimalRoute } from '@/components/routeFinder';
+import { logSearch } from '@/components/searchHistory';
+import { fetchTubeStatusService } from '@/components/serviceStatus';
 import { tubeDatabase } from '@/components/tubeDatabase';
-import { station } from '@/components/types';
+import { Station } from '@/components/types';
 import { useRoute } from '@/contexts/RouteContext';
 import { useRouter } from 'expo-router';
 import * as React from 'react';
 import { Button, Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 export default function SearchScreen() {
-  const { setRoute, path: selectedPath, setPath } = useRoute();
+  // Router allows automatic navigation to another page 
   const router = useRouter();
-  // User text input to search for stations 
+
+  // Route context allows optimal route and station details to be shared across pages without having to access cache or recalculate
+  const { setRoute, path: selectedPath, setPath } = useRoute();
+
+  // Handles user text inputs to search for stations 
   const [startQuery, setStartQuery] = React.useState('');
   const [destinationQuery, setDestinationQuery] = React.useState('');
-  // Station search results for a given text input - station not yet confirmed by user
-  const [startSuggestions, setStartSuggestions] = React.useState<Array<station>>([]);
-  const [destinationSuggestions, setDestinationSuggestions] = React.useState<Array<station>>([]);
-  // Confirmed station selection by user
-  const [selectedStart, setSelectedStart] = React.useState<station | null>(null);
-  const [selectedDestination, setSelectedDestination] = React.useState<station | null>(null);
-  // React Native loading states
+
+  // Displays search results for a given text input - station not yet confirmed by user
+  const [startSuggestions, setStartSuggestions] = React.useState<Array<Station>>([]);
+  const [destinationSuggestions, setDestinationSuggestions] = React.useState<Array<Station>>([]);
+
+  // Stores station selected by user
+  const [selectedStart, setSelectedStart] = React.useState<Station | null>(null);
+  const [selectedDestination, setSelectedDestination] = React.useState<Station | null>(null);
+
+  // Handles react Native loading states
   const [loadingStart, setLoadingStart] = React.useState(false);
   const [loadingDestination, setLoadingDestination] = React.useState(false);
 
-  // Fetch disruptions on program load to allow caching and calculation in pathfinding
+  // Fetches disruptions on program load to allow caching and calculation in pathfinding
   React.useEffect(() => {
-    retrieveDisruptions()
+    fetchTubeStatusService()
       .catch((error) => console.error('Error fetching disruptions on load:', error));
   }, []);
 
-  // Apply station selections set from recent history
+  // Applies station selections onto text box if route is selected from recent history page
   React.useEffect(() => {
+    // If no path selected from history, do nothing
     if (!selectedPath) {
       return;
     }
+
+    // If path selected, apply station selections to text boxes
     const startStationFromHistory = {
       id: selectedPath.fromStationId,
       name: selectedPath.fromStationName!,
@@ -46,15 +56,20 @@ export default function SearchScreen() {
     }
     handleStartStationSelection(startStationFromHistory);
     handleDestinationStationSelection(endStationFromHistory);
-    setPath(null); // clear shared selection so only applies transfer once
+
+    // Clears selection so only applies transfer once
+    setPath(null);
   }, [selectedPath]);
 
-  // Search for starting station suggestions when user types
+  // Searches for starting station suggestions when user types
   React.useEffect(() => {
-    if (startQuery.trim().length < 2) { // Too short to search for stations
-      setStartSuggestions([]); // Clears any previous suggestions 
+    // Doesn't search if input is too short to search for stations
+    if (startQuery.trim().length < 2) {
+      setStartSuggestions([]);
       return;
     }
+
+    // Retrieves station suggestions based on user input, updates state to display suggestions
     setLoadingStart(true);
     tubeDatabase.retrieveStationSuggestions(startQuery)
       .then(setStartSuggestions)
@@ -62,12 +77,15 @@ export default function SearchScreen() {
       .finally(() => setLoadingStart(false));
   }, [startQuery]);
 
-  // Search for destination station suggestions when user types
+  // Searches for destination station suggestions when user types
   React.useEffect(() => {
+    // Doesn't search if input is too short to search for stations
     if (destinationQuery.trim().length < 2) {
       setDestinationSuggestions([]);
       return;
     }
+
+    // Retrieves station suggestions based on user input, updates state to display suggestions
     setLoadingDestination(true);
     tubeDatabase.retrieveStationSuggestions(destinationQuery)
       .then(setDestinationSuggestions)
@@ -75,32 +93,54 @@ export default function SearchScreen() {
       .finally(() => setLoadingDestination(false));
   }, [destinationQuery]);
 
-
-  const handleStartStationSelection = (startStation: station) => {
+  // Handles selection of starting station from suggestions
+  const handleStartStationSelection = (startStation: Station) => {
+    // Saves selected start station
     setSelectedStart(startStation);
+
+    // Applies station name to text box
     setStartQuery(startStation.name);
+
+    // Clears suggestions
     setStartSuggestions([]);
   };
 
-  const handleDestinationStationSelection = (destinationStation: station) => {
+  // Handles selection of destination station from suggestions
+  const handleDestinationStationSelection = (destinationStation: Station) => {
+    // Saves selected destination station
     setSelectedDestination(destinationStation);
+
+    // Applies station name to text box
     setDestinationQuery(destinationStation.name);
+
+    // Clears suggestions
     setDestinationSuggestions([]);
   };
 
+  // Handles search button press
   const handleFindPath = async () => {
+    // Warns user if start or destination stations are not selected, doesn't attempt to find path
     if (!selectedStart || !selectedDestination) {
       console.warn('Pick both stations before searching.');
       return;
     }
 
+    // Logs stations being searched for
     console.log('Finding path from', selectedStart.name, 'to', selectedDestination.name);
+
     try {
+      // Navigates to map page
       router.push('/(tabs)/map');
+
+      // Retrieves optimal route and station details
       const optimalRoute = await retrieveOptimalRoute(selectedStart.id, selectedDestination.id);
+
+      // Updates route context with optimal route to display on map
       setRoute(optimalRoute);
       console.log('Optimal route found:', optimalRoute);
-      await logSearchHistory(selectedStart.id, selectedDestination.id);
+
+      // Logs journey into search history
+      await logSearch(selectedStart.id, selectedDestination.id);
     } catch (error) {
       console.error('Failed to retrieve shortest path:', error);
     }
@@ -115,11 +155,12 @@ export default function SearchScreen() {
           style={styles.headerImage}
         />
       }>
-
+      {/* Tube banner image and header */}
       <Text style={styles.title}>Choose stations to plan a route.</Text>
 
-      {/* Starting station input and suggestions */}
+      {/* Starting station container */}
       <View style={styles.inputFieldContainer}>
+        {/* Starting station text input */}
         <TextInput
           style={styles.searchInput}
           onChangeText={(userInput) => {
@@ -132,6 +173,7 @@ export default function SearchScreen() {
           autoCapitalize="none"
         />
 
+        {/* Starting station suggestions */}
         {loadingStart && <Text style={styles.feedbackText}>Searching…</Text>}
         {!loadingStart && selectedStart && <Text style={styles.feedbackText}>Selected: {selectedStart.name}</Text>}
         {selectedStart === null && (
@@ -149,8 +191,9 @@ export default function SearchScreen() {
         )}
       </View>
 
-      {/* Destination station input and suggestions */}
+      {/* Destination station container */}
       <View style={styles.inputFieldContainer}>
+        {/* Destination station text input */}
         <TextInput
           style={styles.searchInput}
           onChangeText={(userInput) => {
@@ -162,6 +205,8 @@ export default function SearchScreen() {
           autoCorrect={false}
           autoCapitalize="none"
         />
+
+        {/* Destination station suggestions */}
         {loadingDestination && <Text style={styles.feedbackText}>Searching…</Text>}
         {!loadingDestination && selectedDestination && <Text style={styles.feedbackText}>Selected: {selectedDestination.name}</Text>}
         {selectedDestination === null && (
