@@ -53,14 +53,14 @@ async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
 
 // Function that retrieves station name from station ID
 async function retrieveStationName(stationId: number): Promise<string> {
-    const command = `
+    const fetchQuery = `
         SELECT stationName
         FROM stations
         WHERE stationId = ?; 
     `;
     const database = await openDatabase();
     try {
-        const [response] = await database.executeSql(command, [stationId]);
+        const [response] = await database.executeSql(fetchQuery, [stationId]);
         const result = response.rows;
         if (result.length > 0) {
             return result.item(0).stationName;
@@ -75,14 +75,14 @@ async function retrieveStationName(stationId: number): Promise<string> {
 
 // Function that retrieves station coordinates from station ID
 async function retrieveStationCoordinate(stationId: number): Promise<Coordinate> {
-    const command = `
+    const fetchQuery = `
         SELECT latitude, longitude 
         FROM stations
         WHERE stationId = ?; 
     `;
     const database = await openDatabase();
     try {
-        const [response] = await database.executeSql(command, [stationId]);
+        const [response] = await database.executeSql(fetchQuery, [stationId]);
         const result = response.rows;
         if (result.length > 0) {
             const coordinate: Coordinate = {
@@ -101,14 +101,14 @@ async function retrieveStationCoordinate(stationId: number): Promise<Coordinate>
 
 // Function that retrieves Naptan ID from station ID
 async function retrieveNaptanId(stationId: number): Promise<string> {
-    const command = `
+    const fetchQuery = `
         SELECT naptanId
         FROM stations
         WHERE stationId = ?;
     `;
     const database = await openDatabase();
     try {
-        const [response] = await database.executeSql(command, [stationId]);
+        const [response] = await database.executeSql(fetchQuery, [stationId]);
         const result = response.rows;
         if (result.length > 0) {
             return result.item(0).naptanId;
@@ -123,7 +123,7 @@ async function retrieveNaptanId(stationId: number): Promise<string> {
 
 // Function that retrieves potential station names based on search term
 async function retrieveStationSuggestions(searchTerm: string): Promise<Array<Station>> {
-    const command = `
+    const fetchQuery = `
         SELECT stationId, stationName
         FROM stations
         WHERE stationName LIKE ?
@@ -131,7 +131,7 @@ async function retrieveStationSuggestions(searchTerm: string): Promise<Array<Sta
     `;
     const database = await openDatabase();
     try {
-        const [response] = await database.executeSql(command, [`${searchTerm}%`]);
+        const [response] = await database.executeSql(fetchQuery, [`${searchTerm}%`]);
         const result = response.rows;
         const stations: Array<Station> = [];
         for (let i = 0; i < result.length; i++) {
@@ -151,14 +151,14 @@ async function retrieveStationSuggestions(searchTerm: string): Promise<Array<Sta
 
 // Function that retrieves line ID from line name
 async function retrieveLineId(lineName: string): Promise<number> {
-    const command = `
+    const fetchQuery = `
         SELECT lineId
         FROM lines
         WHERE lineName = ?;
     `;
     const database = await openDatabase();
     try {
-        const [response] = await database.executeSql(command, [lineName]);
+        const [response] = await database.executeSql(fetchQuery, [lineName]);
         const result = response.rows;
         if (result.length > 0) {
             return result.item(0).lineId;
@@ -173,14 +173,14 @@ async function retrieveLineId(lineName: string): Promise<number> {
 
 // Function that retrieves line name from line ID
 async function retrieveLineName(lineId: number): Promise<string> {
-    const command = `
+    const fetchQuery = `
         SELECT lineName
         FROM lines
         WHERE lineId = ?;
     `;
     const database = await openDatabase();
     try {
-        const [response] = await database.executeSql(command, [lineId]);
+        const [response] = await database.executeSql(fetchQuery, [lineId]);
         const result = response.rows;
         if (result.length > 0) {
             return result.item(0).lineName;
@@ -195,14 +195,14 @@ async function retrieveLineName(lineId: number): Promise<string> {
 
 // Function that retrieves all neighbouring stations from a station ID, along with line and travel time details
 async function retrieveNeighbourStations(stationId: number): Promise<Array<AdjacentStation>> {
-    const command = `
+    const fetchQuery = `
         SELECT toStationId, lineId, travelTime
         FROM connections
         WHERE connections.fromStationId = ?
     `;
     const database = await openDatabase();
     try {
-        const [response] = await database.executeSql(command, [stationId]);
+        const [response] = await database.executeSql(fetchQuery, [stationId]);
         const result = response.rows;
         const neighbourStations: Array<AdjacentStation> = [];
         for (let i = 0; i < result.length; i++) {
@@ -242,14 +242,14 @@ async function retrieveTransferTime(stationId: number, fromLineId: number, toLin
 
     const database = await openDatabase();
     try {
-        const [result1] = await database.executeSql(directQuery, [stationId, fromLineId, toLineId]);
-        if (result1.rows.length > 0) {
-            const row = result1.rows.item(0);
+        const [directResult] = await database.executeSql(directQuery, [stationId, fromLineId, toLineId]);
+        if (directResult.rows.length > 0) {
+            const row = directResult.rows.item(0);
             return Number(row.transferTime);
         }
-        const [result2] = await database.executeSql(reverseQuery, [stationId, toLineId, fromLineId]);
-        if (result2.rows.length > 0) {
-            const row = result2.rows.item(0);
+        const [reverseResult] = await database.executeSql(reverseQuery, [stationId, toLineId, fromLineId]);
+        if (reverseResult.rows.length > 0) {
+            const row = reverseResult.rows.item(0);
             return Number(row.transferTime);
         }
         throw new Error(`No transfer time for ${stationId} between ${fromLineId} and ${toLineId}. Using default penalty.`);
@@ -261,7 +261,7 @@ async function retrieveTransferTime(stationId: number, fromLineId: number, toLin
 
 // Debug function that retrieves all neighbouring stations from a station name and logs them to console
 async function retrieveNeighbourStationsToView(stationName: string): Promise<void> {
-    const command = `
+    const fetchQuery = `
         SELECT stations.stationName, lines.lineName, connections.travelTime
         FROM connections
         FULL JOIN stations
@@ -276,7 +276,7 @@ async function retrieveNeighbourStationsToView(stationName: string): Promise<voi
     `;
     const database = await openDatabase();
     try {
-        const [response] = await database.executeSql(command, [stationName]);
+        const [response] = await database.executeSql(fetchQuery, [stationName]);
         const result = response.rows;
         for (let i = 0; i < result.length; i++) {
             const row = result.item(i);

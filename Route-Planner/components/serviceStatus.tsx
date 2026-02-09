@@ -46,8 +46,8 @@ async function queryTubeServiceAPI() {
         }
 
         // Parses and returns data in JSON format
-        const data = await response.json();
-        return data;
+        const apiResponseData = await response.json();
+        return apiResponseData;
     } catch (error: any) {
         // Distinguishes between different types of errors for better debugging
         const isAborted = (timeoutController.signal.aborted || error?.name === 'AbortError');
@@ -68,15 +68,15 @@ async function queryTubeServiceAPI() {
 }
 
 // Function that parses API response and converts it to LineStatus objects
-async function parseStatusResponse(data: any[]): Promise<Array<LineStatus>> {
+async function parseStatusResponse(apiResponseData: any[]): Promise<Array<LineStatus>> {
     // If no data returned, it signifies network error and returns empty array to avoid app crashes
-    if (!data) {
+    if (!apiResponseData || apiResponseData.length === 0) {
         return [];
     }
 
     try {
         const tubeStatus: Array<LineStatus> = [];
-        for (const lineData of data) {
+        for (const lineData of apiResponseData) {
             // Retrieves line ID and disruption severity
             const lineId = await tubeDatabase.retrieveLineId(lineData.name);
             const severityLevel = lineData.lineStatuses[0].statusSeverity;
@@ -140,9 +140,9 @@ export function fetchDisruptionTimeForLine(lineId: number | null): number {
     }
 
     // Searches cached status data for disruption matching lineId, returns delay time if found
-    for (const disruption of cachedStatusData) {
-        if (disruption.lineId === lineId) {
-            return disruption.delayMinutes || 0;
+    for (const lineStatus of cachedStatusData) {
+        if (lineStatus.lineId === lineId) {
+            return lineStatus.delayMinutes || 0;
         }
     }
     return 0;

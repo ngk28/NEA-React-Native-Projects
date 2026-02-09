@@ -61,13 +61,13 @@ async function insertSearchInHistory(fromStationId: number, toStationId: number)
 // Function that retrieves search history from database, ordered by most recent searches
 export async function fetchSearchHistory(): Promise<Array<RouteQuery>> {
     const database = await openDatabase();
-    const query = `
+    const fetchQuery = `
         SELECT fromStationId, toStationId
         FROM searchHistory
         ORDER BY timestamp DESC;
     `;
     try {
-        const [response] = await database.executeSql(query);
+        const [response] = await database.executeSql(fetchQuery);
         const result = response.rows;
         const searchHistory: Array<RouteQuery> = [];
         for (let i = 0; i < Math.min(result.length, MAX_HISTORY_ENTRIES); i++) {
@@ -128,13 +128,13 @@ async function countSearchHistoryEntries(): Promise<number> {
 // Function that checks if search query already exists in history
 async function isSearchAlreadyInHistory(fromStationId: number, toStationId: number): Promise<boolean> {
     const database = await openDatabase();
-    const query = `
+    const countQuery = `
         SELECT COUNT(*) as count
         FROM searchHistory
         WHERE fromStationId = ? AND toStationId = ?;
     `;
     try {
-        const [response] = await database.executeSql(query, [fromStationId, toStationId]);
+        const [response] = await database.executeSql(countQuery, [fromStationId, toStationId]);
         const result = response.rows;
         const count = result.item(0).count;
         return count > 0;

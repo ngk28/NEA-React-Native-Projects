@@ -1,9 +1,6 @@
 import { optimalRouteOutcome, RouteQuery } from '@/components/types';
 import React, { createContext, ReactNode, useContext, useState } from 'react';
 
-
-
-
 type RouteContextType = {
     route: optimalRouteOutcome | null;
     setRoute: (route: optimalRouteOutcome | null) => void;
