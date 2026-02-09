@@ -7,7 +7,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 
 export default function TabLayout() {
-  // Get current color scheme/mode of device for theming purposes
+  // Gets current color scheme/mode of device for theming purposes
   const colorScheme = useColorScheme();
 
   return (
@@ -21,7 +21,7 @@ export default function TabLayout() {
           tabBarButton: HapticTab,
         }}>
 
-        {/* Links pages together with corresponding icons and names */}
+        {/* Links respective pages together with corresponding icons and names */}
         <Tabs.Screen
           name="index"
           options={{

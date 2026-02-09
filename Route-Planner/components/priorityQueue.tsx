@@ -61,6 +61,7 @@ export class PriorityQueue<T> {
         return this.items[this.getParentIndex(index)];
     }
 
+    // Swaps two elements in the internal array given their indices
     private swap(indexOne: number, indexTwo: number) {
         const temp = this.items[indexOne];
         this.items[indexOne] = this.items[indexTwo];
@@ -68,7 +69,7 @@ export class PriorityQueue<T> {
     }
 
     public enqueue(item: T, priority: number) {
-        // Add new element to end of array
+        // Adds new element to end of array
         this.items.push(new QueueElement<T>(item, priority));
 
         // Moves newly added element to its correct position higher in tree
@@ -82,7 +83,7 @@ export class PriorityQueue<T> {
             return null;
         }
 
-        // Stores item with highest priority at root
+        // Saves item with highest priority at root
         const root = this.items[0].item;
 
         // Swap first and last element, remove last element (old root) from array
@@ -98,11 +99,11 @@ export class PriorityQueue<T> {
         this.items = new Array<QueueElement<T>>();
     }
 
-    // Move newly added element to its correct position higher in tree
+    // Moves newly added element to its correct position higher in tree
     private heapifyUp() {
         let index = this.items.length - 1;
 
-        // Loops up tree until root node or new element in correct position
+        // Loops up tree until new element becomes root node or in correct position
         while (this.hasParent(index) && this.returnParent(index).priority > this.items[index].priority) {
             const parentIndex = this.getParentIndex(index);
             this.swap(parentIndex, index);
@@ -110,7 +111,7 @@ export class PriorityQueue<T> {
         }
     }
 
-    // Move root element to correct position lower in tree after swapped from remove operation
+    // Moves root element to correct position lower in tree after swapped from remove operation
     private heapifyDown() {
         let index = 0;
 
@@ -122,13 +123,15 @@ export class PriorityQueue<T> {
                 smallerChildIndex = this.getRightChildIndex(index);
             }
 
-            // Parent node in order as smallest element is parent node
+            // Stops process as smallest element is parent node
             if (this.items[index].priority < this.items[smallerChildIndex].priority) {
                 break;
             }
 
-            // Swap parent with smaller child and continue down tree
+            // Swaps parent with smaller child
             this.swap(index, smallerChildIndex);
+
+            // Continues down tree with new index of swapped element
             index = smallerChildIndex;
         }
     }

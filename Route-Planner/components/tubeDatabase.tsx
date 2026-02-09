@@ -3,11 +3,10 @@ import { AdjacentStation, Coordinate, Station } from './types';
 
 // Enables promise-based API for database operations
 SQLite.enablePromise(true);
+const FILE_NAME = 'tubeInformation.db';
 
 // Restricts database to a single instance
 let databaseInstance: SQLite.SQLiteDatabase | null = null;
-
-const FILE_NAME = 'tubeInformation.db'
 
 // Interface for TubeDatabase
 export interface TubeDatabase {
@@ -150,7 +149,6 @@ async function retrieveStationSuggestions(searchTerm: string): Promise<Array<Sta
     }
 }
 
-
 // Function that retrieves line ID from line name
 async function retrieveLineId(lineName: string): Promise<number> {
     const command = `
@@ -225,7 +223,7 @@ async function retrieveNeighbourStations(stationId: number): Promise<Array<Adjac
 
 // Function that retrieves transfer time between lines at a station
 async function retrieveTransferTime(stationId: number, fromLineId: number, toLineId: number): Promise<number> {
-    // Average transfer time between lines is around 4 minutes, so use this as default if no specific transfer time stored in database
+    // Average transfer time between lines is around 4 minutes, so uses this as default if no specific transfer time stored in database (shouldn't be the case though)
     const DEFAULT_TRANSFER_PENALTY_IN_MINUTES = 4;
 
     // Try one way first: fromLineId -> toLineId
@@ -254,8 +252,7 @@ async function retrieveTransferTime(stationId: number, fromLineId: number, toLin
             const row = result2.rows.item(0);
             return Number(row.transferTime);
         }
-        console.warn(`No transfer time for ${stationId} between ${fromLineId} and ${toLineId}. Using default penalty.`);
-        return DEFAULT_TRANSFER_PENALTY_IN_MINUTES;
+        throw new Error(`No transfer time for ${stationId} between ${fromLineId} and ${toLineId}. Using default penalty.`);
     } catch (error) {
         console.error('Error retrieving transfer time:', error);
         return DEFAULT_TRANSFER_PENALTY_IN_MINUTES;

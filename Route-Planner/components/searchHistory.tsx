@@ -4,7 +4,7 @@ import { RouteQuery } from './types';
 
 // Enables promise-based API for database operations
 SQLite.enablePromise(true);
-const DATABASE_FILE_NAME = 'searchHistory.db'
+const DATABASE_FILE_NAME = 'searchHistory.db';
 
 // Maximum number of search history entries to retain
 const MAX_HISTORY_ENTRIES = 15;
@@ -29,10 +29,9 @@ async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
 
 // Function that logs search queries to database
 export async function logSearch(fromStationId: number, toStationId: number): Promise<void> {
-    const database = await openDatabase();
-
     // Checks if search query already exists in history
     const repeatedSearch = await isSearchAlreadyInHistory(fromStationId, toStationId);
+
     if (repeatedSearch) {
         // If search already exists, then updates timestamp to move it to top of history list
         await changeSearchTimestamp(fromStationId, toStationId);

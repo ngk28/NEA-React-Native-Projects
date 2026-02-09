@@ -15,7 +15,7 @@ const severityToDelayMinutes: { [severity: number]: number } = {
     5: 60,  // Part Suspended
 }
 
-// Cache and stores Tube service status and timestamp of last fetch
+// Caches and stores Tube service status and timestamp of last fetch
 let cachedStatusData: Array<LineStatus> | null = null;
 let lastFetchTime: Date | null = null;
 
@@ -62,12 +62,12 @@ async function queryTubeServiceAPI() {
         }
         throw error;
     } finally {
-        // Ensures timeout is cleared in all cases, resets timer for next fetch
+        // Resets timer for next fetch
         clearTimeout(timeout);
     }
 }
 
-// Function that parses API response and convert it to LineStatus objects
+// Function that parses API response and converts it to LineStatus objects
 async function parseStatusResponse(data: any[]): Promise<Array<LineStatus>> {
     // If no data returned, it signifies network error and returns empty array to avoid app crashes
     if (!data) {
@@ -81,10 +81,10 @@ async function parseStatusResponse(data: any[]): Promise<Array<LineStatus>> {
             const lineId = await tubeDatabase.retrieveLineId(lineData.name);
             const severityLevel = lineData.lineStatuses[0].statusSeverity;
 
-            // Converts severity to estimated delay time using severityLevelTime mapping
+            // Converts severity to estimated delay time using severityToDelayMinutes mapping
             const delayMinutes = severityToDelayMinutes[severityLevel];
 
-            // Creates LineStatus object for each disruption based on API response 
+            // Creates LineStatus object for each line based on API response 
             const lineStatus: LineStatus = {
                 lineName: lineData.name,
                 lineId: lineId,
@@ -94,12 +94,12 @@ async function parseStatusResponse(data: any[]): Promise<Array<LineStatus>> {
                 delayMinutes: delayMinutes || 0,
             };
 
-            // Adds disruption event to disruptions array
+            // Adds status event to tubeStatus array
             tubeStatus.push(lineStatus);
         }
         return tubeStatus;
     } catch (error) {
-        console.error('Error parsing disruptions:', error);
+        console.error('Error parsing line statuses:', error);
         throw error;
     }
 }
@@ -116,18 +116,18 @@ export async function fetchTubeStatusService() {
             throw new Error(`No new status data available.`);
         }
 
-        // Updates cache and timestamp of last successful fetch
+        // Updates cache and timestamp if fetch successful
         lastFetchTime = new Date();
         console.log(`New disruption data fetched at ${lastFetchTime.toISOString()}`);
         cachedStatusData = tubeStatus;
         return tubeStatus;
     } catch (error) {
-        // Use cached data if available
+        // Uses cached data if available
         if (cachedStatusData && cachedStatusData.length > 0) {
             return cachedStatusData;
         }
 
-        // If no cached data, return empty array to avoid app crashes
+        // If no cached data, returns empty array to avoid app crashes
         return [];
     }
 }

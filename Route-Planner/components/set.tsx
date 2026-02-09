@@ -1,6 +1,6 @@
 import { AdjacentStation } from "./types";
 
-// Custom Set implementation that stores stationId and lineId combinations to track visited stations
+// Custom Set implementation that stores and tracks visited station-line combinations
 export class VisitedStationSet<K extends AdjacentStation> {
     // Internal Set to store stringified stationId and lineId combinations
     // Keys are stringified versions of stationId and lineId

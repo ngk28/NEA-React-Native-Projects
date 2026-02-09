@@ -1,6 +1,7 @@
 import { calculateBoundaryCoordinates, generateRoutePolyline } from '@/components/jsonManager';
-import { fetchTubeStatusService } from '@/components/serviceStatus';
 import { retrieveCachedRouteStations, retrieveTransferStations } from '@/components/routeFinder';
+import { fetchTubeStatusService } from '@/components/serviceStatus';
+import { ThemedView } from '@/components/themed-view';
 import { LineStatus, Station } from '@/components/types';
 import { useRoute } from '@/contexts/RouteContext';
 import Mapbox from "@rnmapbox/maps";
@@ -14,7 +15,7 @@ Mapbox.setAccessToken(accessToken);
 Mapbox.setTelemetryEnabled(false);
 
 export default function MapScreen() {
-    // Route context allows optimal route and station details to be shared across pages without having to access cache or recalculate
+    // Route context allows optimal route to be shared across pages
     const { route } = useRoute();
 
     // Stores offline map pack
@@ -24,15 +25,14 @@ export default function MapScreen() {
     const cameraRef = useRef<Mapbox.Camera>(null);
 
     // Stores GeoJSON data for exact route to be displayed on map
-    const [routeGeoJSON, setRouteGeoJSON] = useState<GeoJSON.FeatureCollection | null>(null);
+    const [routeGeometry, setRouteGeometry] = useState<GeoJSON.FeatureCollection | null>(null);
 
-
-    // Stores optimal route details like station details, transfer stations and disruptions  
+    // Stores optimal route details like station details, transfer stations and status to generate popups 
     const [stationDetails, setStationDetails] = useState<Array<Station>>([]);
     const [transferStations, setTransferStations] = useState<Array<Station>>([]);
     const [tubeStatus, setTubeStatus] = useState<Array<LineStatus>>([]);
 
-    // Controls display of popups on map for station details, route details and status details
+    // Controls display of popups for station details, route details and status details
     const [highlightedStation, setHighlightedStation] = useState<Station | null>(null);
     const [popupVisible, setPopupVisible] = useState(false);
     const [expandedPopupVisible, setExpandedPopupVisible] = useState(false);
@@ -41,8 +41,8 @@ export default function MapScreen() {
     // Retreives route geometry (from GeoJSON) to display accurate path on map
     async function buildRouteGeometry() {
         try {
-            const routeGeoJSON = await generateRoutePolyline(route!);
-            setRouteGeoJSON(routeGeoJSON);
+            const routeGeometry = await generateRoutePolyline(route!);
+            setRouteGeometry(routeGeometry);
             setPopupVisible(true);
         } catch (err) {
             console.error('Failed to build route geometry:', err);
@@ -50,11 +50,11 @@ export default function MapScreen() {
         }
     }
 
-    // Retreives station details and transfer station data for popup display
+    // Retreives data for popup display
     async function buildPopupData() {
         try {
-            const stationDetail = await retrieveCachedRouteStations();
-            setStationDetails(stationDetail);
+            const stationDetails = await retrieveCachedRouteStations();
+            setStationDetails(stationDetails);
             const transferStations = await retrieveTransferStations();
             setTransferStations(transferStations);
             const tubeStatusData = await fetchTubeStatusService();
@@ -65,11 +65,11 @@ export default function MapScreen() {
     }
 
     // Fits camera to route bounds
-    function fitCameraToRoute(routeGeoJSON: GeoJSON.FeatureCollection) {
+    function fitCameraToRoute(routeGeometry: GeoJSON.FeatureCollection) {
         if (!cameraRef.current) {
             return;
         }
-        const coordinateBounds = calculateBoundaryCoordinates(routeGeoJSON);
+        const coordinateBounds = calculateBoundaryCoordinates(routeGeometry);
         cameraRef.current.fitBounds(
             [coordinateBounds.minLongitude, coordinateBounds.minLatitude],
             [coordinateBounds.maxLongitude, coordinateBounds.maxLatitude],
@@ -103,9 +103,10 @@ export default function MapScreen() {
     }
 
     // Retrieves line status for a given line name 
+    // Only returns status if there is a disruption causing delay, otherwise returns null to indicate no disruption
     function fetchLineStatus(lineName: string): LineStatus | null {
         for (const lineStatus of tubeStatus) {
-            if (lineStatus.lineName === lineName && lineStatus.delayMinutes > 5) {
+            if (lineStatus.lineName === lineName && lineStatus.delayMinutes > 0) {
                 return lineStatus;
             }
         }
@@ -125,11 +126,11 @@ export default function MapScreen() {
         };
     }, []);
 
-    // Rebuilds train path drawn and popup data when new route is searched
+    // Rebuilds train path and popup data when new route is searched
     useEffect(() => {
-        // If no route found, resets map and hides popup
+        // If no route found, resets map and hides popups
         if (!route) {
-            setRouteGeoJSON(null);
+            setRouteGeometry(null);
             setPopupVisible(false);
             return;
         }
@@ -141,10 +142,10 @@ export default function MapScreen() {
 
     // Adjusts camera to fit the route once train path is drawn
     useEffect(() => {
-        if (routeGeoJSON) {
-            fitCameraToRoute(routeGeoJSON);
+        if (routeGeometry) {
+            fitCameraToRoute(routeGeometry);
         }
-    }, [routeGeoJSON]);
+    }, [routeGeometry]);
 
     return (
         <View style={{ flex: 1 }}>
@@ -157,11 +158,11 @@ export default function MapScreen() {
                     centerCoordinate={[-0.1276, 51.5074]}
                 />
 
-                {/* Renders route path only if a path exists */}
-                {routeGeoJSON && routeGeoJSON.features.length > 0 && (
+                {/* Renders route only if a path exists */}
+                {routeGeometry && routeGeometry.features.length > 0 && (
                     <>
-                        {/* Display route on map */}
-                        {routeGeoJSON.features.map((feature, index) => (
+                        {/* Displays exact route onto map as polylines */}
+                        {routeGeometry.features.map((feature, index) => (
                             <Mapbox.ShapeSource key={`route-${index}`} id={`route-${index}`} shape={feature}>
                                 <Mapbox.LineLayer
                                     id={`routeLayer-${index}`}
@@ -174,8 +175,9 @@ export default function MapScreen() {
                             </Mapbox.ShapeSource>
                         ))}
 
-                        {/* Display station markers onto route */}
+                        {/* Displays station markers onto stations on route */}
                         {stationDetails.map((station, index) => {
+                            {/* Identifies type of station (eg start, end, transfer, intermediate) */ }
                             const isStart = (index === 0);
                             const isEnd = (index === stationDetails.length - 1);
                             const isTransfer = (transferStations.some(transferStation => transferStation.id === station.id));
@@ -224,8 +226,8 @@ export default function MapScreen() {
             {highlightedStation && (
                 <View style={styles.stationPopup}>
                     <Text style={styles.stationName}>{highlightedStation.name}</Text>
-                    <Text style={styles.stationDetails}>Line: {formatLineText(highlightedStation.fromLineName, highlightedStation.toLineName)}</Text>
-                    <TouchableOpacity onPress={() => setHighlightedStation(null)} style={styles.closeStationPopup}>
+                    <Text style={styles.stationDetail}>Line: {formatLineText(highlightedStation.fromLineName, highlightedStation.toLineName)}</Text>
+                    <TouchableOpacity onPress={() => setHighlightedStation(null)} style={styles.closeStationPopupButton}>
                         <Text style={styles.closeStationPopupText}>Close</Text>
                     </TouchableOpacity>
                 </View>
@@ -233,10 +235,10 @@ export default function MapScreen() {
 
             { /* Popup showing route details */}
             {popupVisible && route && (
-                <View style={styles.popupContainer}>
-                    <View style={styles.popupCard}>
+                <View style={styles.routePopupContainer}>
+                    <View style={styles.routePopupCard}>
                         {/* Shows travel time and route searched */}
-                        <View style={styles.popupHeader}>
+                        <View style={styles.routePopupHeader}>
                             <Text style={styles.popupTitle}>Route</Text>
                             <Text style={styles.popupTime}>{Math.round(route.totalTravelTime)} min</Text>
                         </View>
@@ -246,11 +248,12 @@ export default function MapScreen() {
                             </View>
                         )}
 
-                        {/* Route summary: Interchange stations and their lines */}
+                        {/* Shows route summary: Interchange stations and their lines */}
                         <View style={styles.transfersList}>
                             {transferStations.map((transferStation) => (
                                 <View style={styles.transferItem} key={`transfer-${transferStation.id}`}>
                                     <Text style={styles.transferName}>{transferStation.name}</Text>
+                                    {/* If there is a disruption on the line, shows a button to view disruption details */}
                                     {fetchLineStatus(transferStation.toLineName || "") ?
                                         <TouchableOpacity style={styles.disruptedLineButton} onPress={() => {
                                             setPopupVisible(false);
@@ -264,17 +267,20 @@ export default function MapScreen() {
                             ))}
                         </View>
 
-                        {/* Button to view all stations in route */}
-                        <View style={styles.popupActionButtons}>
+                        {/* Button to expand popup and view all stations in route */}
+                        <View style={styles.routePopupActionButtons}>
                             <TouchableOpacity onPress={() => setExpandedPopupVisible(!expandedPopupVisible)} style={styles.expandButton}>
                                 <Text style={styles.expandButtonText}>{expandedPopupVisible ? 'Collapse' : 'Show all stations'}</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => { setPopupVisible(false); setExpandedPopupVisible(false); }} style={styles.closeButton}>
+                            <TouchableOpacity onPress={() => {
+                                setPopupVisible(false);
+                                setExpandedPopupVisible(false);
+                            }} style={styles.closeButton}>
                                 <Text style={styles.closeButtonText}>Close</Text>
                             </TouchableOpacity>
                         </View>
 
-                        {/* Shows all stations in route if expanded */}
+                        {/* Shows all stations in route once popup expanded */}
                         {expandedPopupVisible && (
                             <ScrollView style={styles.expandedList}>
                                 {stationDetails.map((station, indexNumber) => (
@@ -295,9 +301,9 @@ export default function MapScreen() {
 
             { /* Popup showing disruption details */}
             {selectedLineStatus && (
-                <View style={styles.popupContainer}>
-                    <View style={styles.popupCard}>
-                        <View style={styles.popupHeader}>
+                <View style={styles.routePopupContainer}>
+                    <View style={styles.routePopupCard}>
+                        <View style={styles.routePopupHeader}>
                             <Text style={styles.popupTitle}>Disruption on {selectedLineStatus.lineName}</Text>
                         </View>
                         <View style={styles.routeSummary}>
@@ -305,7 +311,7 @@ export default function MapScreen() {
                             <Text>Reason: {selectedLineStatus.reason}</Text>
                             <Text>Expected delay: {selectedLineStatus.delayMinutes} minutes</Text>
                         </View>
-                        <View style={styles.popupActionButtons}>
+                        <View style={styles.routePopupActionButtons}>
                             <TouchableOpacity onPress={() => { setSelectedLineStatus(null); setPopupVisible(true); }} style={styles.closeButton}>
                                 <Text style={styles.closeButtonText}>Close</Text>
                             </TouchableOpacity>
@@ -324,7 +330,7 @@ export default function MapScreen() {
     );
 }
 
-// Function that formats line text for display on popups, accounting for different scenarios of line changes 
+// Function that formats line text for display on popups, accounts for different scenarios of line changes 
 function formatLineText(fromLineName: string | null | undefined, toLineName: string | null | undefined): string {
     if (!fromLineName) {
         return toLineName!;
@@ -363,7 +369,7 @@ const styles = StyleSheet.create({
         padding: 15,
         alignItems: 'center',
     },
-    stationDetails: {
+    stationDetail: {
         fontSize: 16,
         marginBottom: 10,
     },
@@ -373,7 +379,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         borderRadius: 4,
     },
-    closeStationPopup: {
+    closeStationPopupButton: {
         marginTop: 10,
         paddingVertical: 6,
         paddingHorizontal: 12,
@@ -388,20 +394,20 @@ const styles = StyleSheet.create({
         fontSize: 18,
         marginBottom: 8,
     },
-    popupContainer: {
+    routePopupContainer: {
         position: 'absolute',
         left: 10,
         right: 10,
         bottom: 14,
         alignItems: 'center',
     },
-    popupCard: {
+    routePopupCard: {
         width: '100%',
         backgroundColor: '#ffffff',
         borderRadius: 15,
         padding: 15,
     },
-    popupHeader: {
+    routePopupHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -436,7 +442,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#3b3b3b',
     },
-    popupActionButtons: {
+    routePopupActionButtons: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginTop: 6,

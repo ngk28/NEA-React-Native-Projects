@@ -1,16 +1,19 @@
-import { tubeDatabase, TubeDatabase } from '@/components/tubeDatabase';
+import { tubeDatabase } from '@/components/tubeDatabase';
 import { AdjacentStation, OptimalRouteResult, RouteQuery, Station } from '@/components/types';
 import { HashTable } from './hashTable';
 import { PriorityQueue } from './priorityQueue';
-import { VisitedStationSet } from './set';
 import {
-    fetchTransferTime, estimateTimeBetweenStations, calculateDisruptionDelay, buildRouteStationDetails
+    buildRouteStationDetails,
+    calculateDisruptionDelay,
+    estimateTimeBetweenStations,
+    fetchTransferTime
 } from './routeFinderHelper';
+import { VisitedStationSet } from './set';
 
 // Stores the most recently calculated optimal path for quick access
 let cachedOptimalRouteResult: OptimalRouteResult | null = null;
 let cachedRouteIdentifier: RouteQuery | null = null;
-let storedRouteStationList: Array<Station> | null = null;
+let cachedRouteStationList: Array<Station> | null = null;
 
 // Function that implements the A* algorithm to find the optimal route between two stations
 async function computeOptimalRoute(fromStationId: number, toStationId: number): Promise<OptimalRouteResult> {
@@ -89,15 +92,15 @@ async function computeOptimalRoute(fromStationId: number, toStationId: number): 
 
     // Helper function that builds optimal route result object once destination is reached
     function buildOptimalRouteResult(destinationStation: AdjacentStation): OptimalRouteResult {
-        // Retreieves diagnostic information for optimal route result
-        const stationLinePairsEvaluated = visitedStationLinePairs.size();
-        const stationLinePairsInQueue = priorityQueue.size();
-
         // Reconstructs optimal path by backtracking from destination to start using previousNodeMap
         const shortestPath = backtrackNodesVisited(previousStation, destinationStation);
         const shortestPathStations = shortestPath.stationSequence;
         const shortestPathLines = shortestPath.lineSequence;
         const totalTime = timeToStation.get(destinationStation)!;
+
+        // Retreieves diagnostic information for optimal route result
+        const stationLinePairsEvaluated = visitedStationLinePairs.size();
+        const stationLinePairsInQueue = priorityQueue.size();
 
         // Builds and returns optimal route result object
         const optimalRoute: OptimalRouteResult = {
@@ -127,14 +130,14 @@ function retrieveCachedOptimalRoute(): OptimalRouteResult {
 // Function that returns cached path station details, catches null error
 export function retrieveCachedRouteStations(): Array<Station> {
     try {
-        if (storedRouteStationList === null) {
+        if (cachedRouteStationList === null) {
             throw new Error('No cached route station details available.');
         }
     } catch (error) {
         console.error('Error retrieving cached route station details:', error);
         throw error;
     }
-    return storedRouteStationList;
+    return cachedRouteStationList;
 }
 
 // Function that returns transfer stations on the optimal route with their details
@@ -144,49 +147,36 @@ export async function retrieveTransferStations(): Promise<Array<Station>> {
     return transferStations;
 }
 
-// async function fetchRouteStationDetails(): Promise<Array<Station>> {
-//     // If cached station details exist and route key matches, returns cached station details as no need to recompute
-//     const routeKey: RouteQuery = {
-//         fromStationId: route.stationSequence[0],
-//         toStationId: route.stationSequence[route.stationSequence.length - 1]
-//     };
-//     if (storedRouteStationList !== null && cachedRouteIdentifier !== null && cachedRouteIdentifier === routeKey) {
-//         return getCachedRouteStations();
-//     }
-
-// }
-
 // Function that initiates and exports optimal route calculation
 export async function retrieveOptimalRoute(fromStationId: number, toStationId: number): Promise<OptimalRouteResult> {
     // Tries to use cached path if available and route key matches
-    const segment: RouteQuery = {
+    const searchedRoute: RouteQuery = {
         fromStationId: fromStationId,
         toStationId: toStationId
     };
-    if (cachedOptimalRouteResult !== null && cachedRouteIdentifier !== null && cachedRouteIdentifier === segment) {
+    if (cachedOptimalRouteResult !== null && cachedRouteIdentifier !== null && cachedRouteIdentifier === searchedRoute) {
         return retrieveCachedOptimalRoute();
     }
 
-    // Computes optimal route as no cached result available
-    // Caches optimal route result and station details 
-    const shortestPath = await computeOptimalRoute(fromStationId, toStationId);
-    cachedOptimalRouteResult = shortestPath;
+    // Computes and caches optimal route as no cached result available
+    const optimalRoute = await computeOptimalRoute(fromStationId, toStationId);
+    cachedOptimalRouteResult = optimalRoute;
 
     // Builds station details for optimal route, easier to access and display stations on map
-    const generatedStationDetails = await buildRouteStationDetails(shortestPath);
-    storedRouteStationList = generatedStationDetails;
-    cachedRouteIdentifier = segment;
+    const generatedStationDetails = await buildRouteStationDetails(optimalRoute);
+    cachedRouteStationList = generatedStationDetails;
+    cachedRouteIdentifier = searchedRoute;
 
     // Diagnostic logs
     // console.log('From station ID:', fromStationId, 'To station ID:', toStationId);
-    // console.log('Station-line pairs visited:', result.stationLinePairsEvaluated);
-    // console.log('Station-line pairs in queue:', result.stationLinePairsInQueue);
-    // console.log('Shortest path (stations):', result.optimalStationSequence, 'Total time:', result.totalTime);
-    // console.log('Shortest path (names):', await getStationNames(shortestPath.optimalStationSequence));
-    // console.log('Shortest path (lines):', result.optimizedLineSequence);
-    // console.log('Shortest path (line names):', await getLineNames(shortestPath.optimizedLineSequence));
+    // console.log('Station-line pairs visited:', optimalRoute.stationLinePairsEvaluated);
+    // console.log('Station-line pairs in queue:', optimalRoute.stationLinePairsInQueue);
+    // console.log('Shortest path (stations):', optimalRoute.stationSequence, 'Total time:', optimalRoute.totalTravelTime);
+    // console.log('Shortest path (names):', await fetchStationNames(optimalRoute.stationSequence));
+    // console.log('Shortest path (lines):', optimalRoute.lineSequence);
+    // console.log('Shortest path (line names):', await fetchLineNames(optimalRoute.lineSequence));
 
-    return shortestPath;
+    return optimalRoute;
 }
 
 // Function that retraces path from destination to start station using previousNodeMap
@@ -197,13 +187,13 @@ function backtrackNodesVisited(previousStation: HashTable<AdjacentStation, Adjac
 
     let activeStation: AdjacentStation | null = destinationStation;
 
-    // Loops until start station reached (previous node is null)
+    // Loops until start station reached (previous node of start station is null)
     while (activeStation !== null) {
         // Extracts station and line IDs for current station
         const stationId = activeStation.stationId;
         const lineId = activeStation.lineId;
 
-        // Adds station and line IDs to sequence
+        // Adds station ID to sequence
         stationSequence.unshift(stationId);
 
         // Adds line ID to sequence if not null
@@ -218,4 +208,3 @@ function backtrackNodesVisited(previousStation: HashTable<AdjacentStation, Adjac
     // Returns object containing station and line sequences for optimal path
     return { stationSequence, lineSequence };
 }
-

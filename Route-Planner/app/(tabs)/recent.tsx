@@ -1,4 +1,4 @@
-import { fetchSearchHistory, cleanUpSearchHistory } from '@/components/searchHistory';
+import { cleanUpSearchHistory, fetchSearchHistory } from '@/components/searchHistory';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { RouteQuery } from '@/components/types';
@@ -17,7 +17,7 @@ export default function RecentScreen() {
     // Router for navigation between pages
     const router = useRouter();
 
-    // Fetches recent search history from database
+    // Fetches recent search history entries from database
     const fetchRecentSearches = async () => {
         try {
             const searches = await fetchSearchHistory();
@@ -42,7 +42,7 @@ export default function RecentScreen() {
         router.push('/');
     }
 
-    // Handles clear history button clicked
+    // Handles clear history button being clicked
     const clearHistory = async () => {
         try {
             await cleanUpSearchHistory();
@@ -64,17 +64,17 @@ export default function RecentScreen() {
     return (
         <View style={styles.container}>
             {/* Title for recent searches page */}
-            <ThemedText type="subtitle" style={styles.title}>Recent Searches</ThemedText>
+            <ThemedText style={styles.title}>Recent Searches</ThemedText>
 
             <ScrollView contentContainerStyle={styles.scrollContent} style={{ width: '100%' }}>
-                {/* Message if no recent searches found */}
+                {/* Shows message if no recent searches found */}
                 {recentSearches.length === 0 && (
                     <ThemedText type="default">No recent searches found.</ThemedText>
                 )}
 
                 {/* Displays every recent search with a button to search again */}
                 {recentSearches.map((search, index) => (
-                    <ThemedView style={styles.card} key={index}>
+                    <ThemedView style={styles.searchHistoryCard} key={index}>
                         <ThemedText type="default" style={styles.station}>{search.fromStationName} → {search.toStationName}</ThemedText>
                         <TouchableOpacity onPress={() => handleSearchAgain(search)} style={styles.searchAgainButton}>
                             <Text style={styles.searchAgainButtonText}>{'>'}</Text>
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
         paddingTop: 24,
         alignItems: 'center',
     },
-    card: {
+    searchHistoryCard: {
         borderRadius: 8,
         padding: 16,
         marginVertical: 8,

@@ -1,5 +1,5 @@
 import { tubeDatabase } from '@/components/tubeDatabase';
-import { AdjacentStation, Coordinate, Station, OptimalRouteResult } from '@/components/types';
+import { AdjacentStation, Coordinate, OptimalRouteResult, Station } from '@/components/types';
 import { HashTable } from './hashTable';
 import { fetchDisruptionTimeForLine } from './serviceStatus';
 
@@ -79,28 +79,40 @@ export async function calculateDisruptionDelay(currentStation: AdjacentStation, 
     return 0;
 }
 
-// Function that builds station objects from names and sequence
-export function buildStationDetails(stationNames: Array<string>, stationSequence: Array<number>): Array<Station> {
-    const stations: Array<Station> = [];
-    for (let i = 0; i < stationSequence.length; i++) {
-        const stationDetail: Station = {
-            id: stationSequence[i],
-            name: stationNames[i],
-        };
-        stations.push(stationDetail);
+// Function that checks if line is already present in path 
+// Ensures disruption time is only added once per line, even if multiple stations on same line
+function isLineInVisitedPath(previousNodeMap: HashTable<AdjacentStation, AdjacentStation | null>, currentStation: AdjacentStation, lineToNeighbour: number | null): boolean {
+    // If line to neighbour is null (possible for starting station with no incoming line), then returns false
+    if (lineToNeighbour === null) {
+        return false;
     }
-    return stations;
+
+    let activeStation: AdjacentStation | null = currentStation;
+
+    // Iterates backwards from current station to starting station
+    while (activeStation !== null) {
+        // Checks if a previously visited line matches the line to neighbour
+        const visitedLine = activeStation.lineId;
+
+        // If line to neighbour already present in path, then returns true
+        if (visitedLine === lineToNeighbour) {
+            return true;
+        }
+
+        // Moves to previous station in path
+        activeStation = previousNodeMap.get(activeStation) || null;
+    }
+    return false;
 }
 
-// Function that generates a list of stations with their corresponding details for the optimal route
+// Function that generates a list of stations with all their corresponding details for the optimal route
 export async function buildRouteStationDetails(route: OptimalRouteResult): Promise<Array<Station>> {
     // Retrieves route details
     const stationSequence = route.stationSequence;
     const lineSequence = route.lineSequence;
-    const stationNames = await fetchStationNames(stationSequence);
 
     // Creates array of station details for stations on route
-    const stationOnPathDetails: Array<Station> = buildStationDetails(stationNames, stationSequence);
+    const stationOnPathDetails: Array<Station> = await buildStationDetails(stationSequence);
 
     // Adds line names and coordinates to station details
     await addLineNamesToStations(stationOnPathDetails, lineSequence, stationSequence);
@@ -109,13 +121,28 @@ export async function buildRouteStationDetails(route: OptimalRouteResult): Promi
     return stationOnPathDetails;
 }
 
+// Function that builds station objects from names and sequence
+async function buildStationDetails(stationSequence: Array<number>): Promise<Array<Station>> {
+    const stationNames = await fetchStationNames(stationSequence);
+
+    const stationDetails: Array<Station> = [];
+    for (let i = 0; i < stationSequence.length; i++) {
+        const stationDetail: Station = {
+            id: stationSequence[i],
+            name: stationNames[i],
+        };
+        stationDetails.push(stationDetail);
+    }
+    return stationDetails;
+}
+
 // Function that adds coordinates to station details
-export async function addCoordinatesToStations(stationDetails: Array<Station>) {
+async function addCoordinatesToStations(stationDetails: Array<Station>) {
     try {
         for (let i = 0; i < stationDetails.length; i++) {
-            const coordinate: Coordinate = await tubeDatabase.retrieveStationCoordinate(stationDetails[i].id);
-            stationDetails[i].latitude = coordinate.latitude;
-            stationDetails[i].longitude = coordinate.longitude;
+            const stationCoordinate: Coordinate = await tubeDatabase.retrieveStationCoordinate(stationDetails[i].id);
+            stationDetails[i].latitude = stationCoordinate.latitude;
+            stationDetails[i].longitude = stationCoordinate.longitude;
         }
     } catch (error) {
         console.error('Error adding coordinates to station list:', error);
@@ -123,7 +150,7 @@ export async function addCoordinatesToStations(stationDetails: Array<Station>) {
 }
 
 // Function that adds line names to station details
-export async function addLineNamesToStations(stationDetails: Array<Station>, lineSequence: Array<number>, stationSequence: Array<number>) {
+async function addLineNamesToStations(stationDetails: Array<Station>, lineSequence: Array<number>, stationSequence: Array<number>) {
     try {
         // Loops through stations on route
         for (let i = 0; i < stationDetails.length; i++) {
@@ -157,32 +184,11 @@ export async function fetchStationNames(stationSequence: Array<number>): Promise
 }
 
 // Function that converts sequence of line IDs to line names
-async function fetchLineNames(lineSequence: Array<number>): Promise<Array<string>> {
+export async function fetchLineNames(lineSequence: Array<number>): Promise<Array<string>> {
     const lineNames: Array<string> = [];
     for (const lineId of lineSequence) {
         const lineName = await tubeDatabase.retrieveLineName(lineId);
         lineNames.push(lineName);
     }
     return lineNames;
-}
-
-// Function that checks if line is already present in path 
-// Ensures disruption time is only added once per line, even if multiple stations on same line
-function isLineInVisitedPath(previousNodeMap: HashTable<AdjacentStation, AdjacentStation | null>, currentStation: AdjacentStation, lineToNeighbour: number | null): boolean {
-    // If line to neighbour is null (possible for starting station with no incoming line), then returns false
-    if (lineToNeighbour === null) {
-        return false;
-    }
-
-    // Iterates backwards through path from current station to starting station
-    let activeStation: AdjacentStation | null = currentStation;
-    while (activeStation !== null) {
-        // Checks if a previously visited line matches the line to neighbour
-        const visitedLine = activeStation.lineId;
-        if (visitedLine === lineToNeighbour) {
-            return true;
-        }
-        activeStation = previousNodeMap.get(activeStation) || null;
-    }
-    return false;
 }

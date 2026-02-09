@@ -3,7 +3,7 @@ import * as GeoJSON from 'geojson';
 import tubePolylines from '../assets/tubeLines.json';
 import { tubeDatabase } from './tubeDatabase';
 
-// London Underground line colours
+// London Underground line colours to display route segments in correct colour on map
 const LINE_COLOURS_MAP: { [lineName: string]: string } = {
     'Bakerloo': '#B26300',
     'Central': '#DC241F',
@@ -18,7 +18,6 @@ const LINE_COLOURS_MAP: { [lineName: string]: string } = {
     'Waterloo & City': '#76D0BD',
     'Interchange - Walking': '#5E3D3D',
 };
-
 
 // Function that retrieves all polylines needed to draw a given route
 export async function generateRoutePolyline(optimalRoute: OptimalRouteResult): Promise<GeoJSON.FeatureCollection> {
@@ -65,12 +64,10 @@ async function findSegmentFeatures(fromStationId: number, toStationId: number, l
     // Retrieves line name for given line ID 
     const lineName = await tubeDatabase.retrieveLineName(lineId);
 
-    // Collects matching features for this segment (some segments may map to multiple GeoJSON features)
     const segmentFeatures = Array<GeoJSON.Feature>();
 
     // Loop through all features in GeoJSON file
     for (const feature of tubePolylines.features) {
-        // If match found, adds feature to array 
         if (featureMatchesSegment(fromNaptanId, toNaptanId, lineName, feature)) {
             // Adds line color to feature properties for styling 
             const featureWithColor = {
@@ -80,6 +77,7 @@ async function findSegmentFeatures(fromStationId: number, toStationId: number, l
                 }
             } as GeoJSON.Feature;
 
+            // Saves feature with color to segment array
             segmentFeatures.push(featureWithColor);
         }
     }
@@ -89,11 +87,11 @@ async function findSegmentFeatures(fromStationId: number, toStationId: number, l
         return null;
     }
 
-    // Return array of all matching features for this segment
     return segmentFeatures;
 }
 
 // Function that checks whether a GeoJSON feature represents a given segment
+// Feature can match segment in either direction (ie from-to or to-from) 
 function featureMatchesSegment(fromNaptanId: string, toNaptanId: string, lineName: string, feature: any): boolean {
     const featureDetail = feature.properties;
 
@@ -123,7 +121,6 @@ function featureMatchesSegment(fromNaptanId: string, toNaptanId: string, lineNam
 
 // Function that calculates boundary coordinates for a route, used to set map view to fit entire route
 export function calculateBoundaryCoordinates(routePolylines: GeoJSON.FeatureCollection): CoordinateRange {
-    // Creates 2D array to store all coordinates from all features in route 
     const coordinates: number[][] = [];
 
     // Loops through all features in route

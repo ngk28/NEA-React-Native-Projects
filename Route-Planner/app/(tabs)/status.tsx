@@ -44,9 +44,9 @@ export default function DisruptionScreen() {
     }
   };
 
-  // Timer to fetch tube status every 60 seconds
+  // Fetches tube status on program load or every 60 seconds
   useEffect(() => {
-    // Initial fetch on program load
+    // Fetch tube status
     fetchTubeStatus();
 
     // Sets up interval to fetch tube status every 60 seconds
@@ -61,7 +61,7 @@ export default function DisruptionScreen() {
 
   // Function to render each status item on the page
   const renderLineStatus = ({ item }: { item: LineStatus }) => (
-    <ThemedView style={styles.card}>
+    <ThemedView style={styles.statusCard}>
       <ThemedText type="title" style={styles.lineName}>{item.lineName}</ThemedText>
       <ThemedText type="default">Status: {item.status}</ThemedText>
       {item.reason ? (
@@ -75,26 +75,27 @@ export default function DisruptionScreen() {
       {/* Title for real-time line status page */}
       <ThemedText type="title" style={styles.title}>Real-Time Line Status</ThemedText>
 
-      {/* Last updated time */}
+      {/* Shows last updated time */}
       {lastUpdated && (
-        <ThemedText type="default" style={styles.updated}>Last updated: {lastUpdated.toLocaleTimeString()}</ThemedText>
+        <ThemedText type="default" style={styles.updatedTimeText}>Last updated: {lastUpdated.toLocaleTimeString()}</ThemedText>
       )}
 
       {/* No data available message */}
       {!lastUpdated && !loading && (
-        <ThemedText type="default" style={styles.updated}>No real-time status available.</ThemedText>
+        <ThemedText type="default" style={styles.updatedTimeText}>No real-time status available.</ThemedText>
       )}
 
-      {/* Renders status cards for each line */}
+      {/* Renders status for each line */}
+      {/* Fetches real-time tube status if user refreshes */}
       <FlatList
         data={lineStatus}
-        keyExtractor={(lineStatus) => lineStatus.lineName}
+        keyExtractor={(item) => item.lineName}
         renderItem={renderLineStatus}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchTubeStatus} />}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={styles.statusList}
       />
 
-      {/* Error message if fetch fails */}
+      {/* Shows error message if fetch failed */}
       {fetchError && !loading && (
         <View style={styles.errorPopUp}>
           <ThemedText type="default">Error fetching tube status - Check your connection. Please try again.</ThemedText>
@@ -111,22 +112,29 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   title: {
+    paddingTop: 24,
     fontSize: 30,
     fontWeight: 'bold',
     marginBottom: 8,
+    alignSelf: 'center',
   },
-  updated: {
+  updatedTimeText: {
     marginBottom: 12,
+    marginTop: 2,
+    marginLeft: 8,
   },
-  listContent: {
+  statusList: {
     paddingBottom: 24,
+    width: '100%',
   },
-  card: {
+  statusCard: {
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#dbd8d8',
+    marginVertical: 8,
+    width: '100%',
   },
   lineName: {
     marginBottom: 6,
