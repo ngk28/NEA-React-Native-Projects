@@ -102,6 +102,7 @@ const styles = StyleSheet.create({
         paddingTop: 24,
         fontSize: 30,
         fontWeight: 'bold',
+        paddingBottom: 24
     },
     scrollContent: {
         paddingBottom: 24,

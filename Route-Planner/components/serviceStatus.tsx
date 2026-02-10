@@ -10,7 +10,7 @@ const STATUS_FETCH_TIMEOUT_MS = 7000;
 // Convert TfL API severity levels to estimated delay times in minutes
 const severityToDelayMinutes: { [severity: number]: number } = {
     10: 0,   // Good Service
-    9: 15,   // Minor Delays
+    9: 10,   // Minor Delays
     6: 30,  // Severe Delays
     5: 60,  // Part Suspended
 }

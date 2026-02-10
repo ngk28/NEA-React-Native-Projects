@@ -10,7 +10,6 @@ let databaseInstance: SQLite.SQLiteDatabase | null = null;
 
 // Interface for TubeDatabase
 export interface TubeDatabase {
-    openDatabase(): Promise<SQLite.SQLiteDatabase>;
     retrieveStationName(stationId: number): Promise<string>;
     retrieveStationCoordinate(stationId: number): Promise<Coordinate>;
     retrieveNaptanId(stationId: number): Promise<string>;
@@ -23,7 +22,6 @@ export interface TubeDatabase {
 }
 
 export const tubeDatabase: TubeDatabase = {
-    openDatabase,
     retrieveStationName,
     retrieveStationCoordinate,
     retrieveNaptanId,

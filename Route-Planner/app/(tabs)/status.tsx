@@ -98,7 +98,7 @@ export default function DisruptionScreen() {
       {/* Shows error message if fetch failed */}
       {fetchError && !loading && (
         <View style={styles.errorPopUp}>
-          <ThemedText type="default">Error fetching tube status - Check your connection. Please try again.</ThemedText>
+          <ThemedText type="default">Error fetching Tube status - Check your connection. Please try again.</ThemedText>
         </View>
       )}
     </View>
