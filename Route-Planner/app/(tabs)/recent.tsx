@@ -1,4 +1,4 @@
-import { cleanUpSearchHistory, fetchSearchHistory } from '@/components/searchHistory';
+import { cleanUpSearchHistory, clearSearchHistory, fetchSearchHistory } from '@/components/searchHistory';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { RouteQuery } from '@/components/types';
@@ -45,7 +45,7 @@ export default function RecentScreen() {
     // Handles clear history button being clicked
     const clearHistory = async () => {
         try {
-            await cleanUpSearchHistory();
+            await clearSearchHistory();
             setRecentSearches([]);
         } catch (error) {
             console.error('Error clearing search history:', error);

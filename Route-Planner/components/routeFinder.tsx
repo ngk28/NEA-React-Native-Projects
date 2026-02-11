@@ -6,8 +6,10 @@ import {
     buildRouteStationDetails,
     calculateDisruptionDelay,
     estimateTimeBetweenStations,
+    fetchStationNames,
     fetchTransferTime
 } from './routeFinderHelper';
+import { fetchTubeStatusService } from './serviceStatus';
 import { VisitedStationSet } from './set';
 
 // Stores the most recently calculated optimal path for quick access
@@ -51,6 +53,7 @@ async function computeOptimalRoute(fromStationId: number, toStationId: number): 
         // Optimal path found so exits loop, returning optimal route result 
         if (currentStation.stationId === toStationId) {
             const optimalRoute = buildOptimalRouteResult(currentStation);
+            // console.log('Optimal route found:', optimalRoute);
             return optimalRoute;
         }
 
@@ -158,6 +161,9 @@ export async function retrieveOptimalRoute(fromStationId: number, toStationId: n
         return retrieveCachedOptimalRoute();
     }
 
+    // Fetches latest disruption data for up-to-date information
+    await fetchTubeStatusService();
+
     // Computes and caches optimal route as no cached result available
     const optimalRoute = await computeOptimalRoute(fromStationId, toStationId);
     cachedOptimalRouteResult = optimalRoute;
@@ -172,7 +178,7 @@ export async function retrieveOptimalRoute(fromStationId: number, toStationId: n
     // console.log('Station-line pairs visited:', optimalRoute.stationLinePairsEvaluated);
     // console.log('Station-line pairs in queue:', optimalRoute.stationLinePairsInQueue);
     // console.log('Shortest path (stations):', optimalRoute.stationSequence, 'Total time:', optimalRoute.totalTravelTime);
-    // console.log('Shortest path (names):', await fetchStationNames(optimalRoute.stationSequence));
+    console.log('Shortest path (names):', await fetchStationNames(optimalRoute.stationSequence));
     // console.log('Shortest path (lines):', optimalRoute.lineSequence);
     // console.log('Shortest path (line names):', await fetchLineNames(optimalRoute.lineSequence));
 

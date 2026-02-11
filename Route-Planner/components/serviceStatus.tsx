@@ -1,8 +1,6 @@
 import { tubeDatabase } from "./tubeDatabase";
 import { LineStatus } from "./types";
-
-// TfL API key 
-const API_KEY = '1a771aa56d4743848a262e4d2160b34f';
+import { TFL_ACCESS_TOKEN } from "./secrets";
 
 // Timeout for fetching disruption data, prevents long waits in case of network issues or unresponsive API
 const STATUS_FETCH_TIMEOUT_MS = 7000;
@@ -35,7 +33,7 @@ async function queryTubeServiceAPI() {
             headers: {
                 'Content-Type': 'application/json',
                 'Cache-Control': 'no-cache',
-                'app_key': API_KEY,
+                'app_key': TFL_ACCESS_TOKEN,
             },
             signal: timeoutController.signal,
         });
@@ -118,7 +116,7 @@ export async function fetchTubeStatusService() {
 
         // Updates cache and timestamp if fetch successful
         lastFetchTime = new Date();
-        console.log(`New disruption data fetched at ${lastFetchTime.toISOString()}`);
+        console.log(`New disruption data fetched at ${lastFetchTime.toLocaleString()}`);
         cachedStatusData = tubeStatus;
         return tubeStatus;
     } catch (error) {

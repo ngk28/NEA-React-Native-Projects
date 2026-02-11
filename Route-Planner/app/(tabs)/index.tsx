@@ -139,7 +139,6 @@ export default function SearchScreen() {
 
       // Updates route context with optimal route to display on map
       setRouteResult(optimalRoute);
-      console.log('Optimal route found:', optimalRoute);
 
       // Logs journey into search history
       await logSearch(selectedStart.id, selectedDestination.id);
