@@ -77,6 +77,19 @@ export default function MapScreen() {
         );
     }
 
+    // Function that formats line text for display on popups, accounts for different scenarios of line changes 
+    function formatLineText(fromLineName: string | null | undefined, toLineName: string | null | undefined): string {
+        if (!fromLineName) {
+            return toLineName!;
+        } else if (!toLineName) {
+            return fromLineName!;
+        } else if (fromLineName === toLineName) {
+            return fromLineName!;
+        } else {
+            return `${fromLineName} → ${toLineName}`;
+        }
+    }
+
     // Retrieves line status for a given line name 
     // Only returns status if there is a disruption causing delay, otherwise returns null to indicate no disruption
     function fetchLineStatus(lineName: string): LineStatus | null {
@@ -308,19 +321,6 @@ export default function MapScreen() {
             )}
         </View>
     );
-}
-
-// Function that formats line text for display on popups, accounts for different scenarios of line changes 
-function formatLineText(fromLineName: string | null | undefined, toLineName: string | null | undefined): string {
-    if (!fromLineName) {
-        return toLineName!;
-    } else if (!toLineName) {
-        return fromLineName!;
-    } else if (fromLineName === toLineName) {
-        return fromLineName!;
-    } else {
-        return `${fromLineName} → ${toLineName}`;
-    }
 }
 
 const styles = StyleSheet.create({
