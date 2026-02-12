@@ -5,7 +5,7 @@ import { TFL_ACCESS_TOKEN } from "./secrets";
 // Timeout for fetching disruption data, prevents long waits in case of network issues or unresponsive API
 const STATUS_FETCH_TIMEOUT_MS = 7000;
 
-// Convert TfL API severity levels to estimated delay times in minutes
+// Converts TfL API severity levels to estimated delay times in minutes
 const severityToDelayMinutes: { [severity: number]: number } = {
     10: 0,   // Good Service
     9: 10,   // Minor Delays

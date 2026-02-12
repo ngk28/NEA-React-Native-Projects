@@ -107,7 +107,7 @@ async function changeSearchTimestamp(fromStationId: number, toStationId: number)
     }
 }
 
-// Function that retrieves number of stored search queries in database
+// Function that counts number of stored search queries in database
 async function countSearchHistoryEntries(): Promise<number> {
     const countQuery = `
         SELECT COUNT(*) as count
@@ -173,7 +173,8 @@ async function deleteOldestEntries(entriesToDelete: number): Promise<void> {
         );
     `;
     try {
-        await database.executeSql(deleteQuery, [entriesToDelete]);
+        const response = await database.executeSql(deleteQuery, [entriesToDelete]);
+        // console.log('Rows deleted:', response[0].rowsAffected);
     } catch (error) {
         console.error('Failed to clean up search history:', error);
         throw error;
@@ -187,7 +188,8 @@ export async function clearSearchHistory(): Promise<void> {
         DELETE FROM searchHistory;
     `;
     try {
-        await database.executeSql(deleteQuery);
+        const response = await database.executeSql(deleteQuery);
+        // console.log('Rows deleted:', response[0].rowsAffected);
     } catch (error) {
         console.error('Failed to clear search history:', error);
         throw error;

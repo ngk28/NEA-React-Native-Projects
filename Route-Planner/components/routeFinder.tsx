@@ -162,7 +162,7 @@ export async function retrieveOptimalRoute(fromStationId: number, toStationId: n
     }
 
     // Fetches latest disruption data for up-to-date information
-    await fetchTubeStatusService();
+    fetchTubeStatusService();
 
     // Computes and caches optimal route as no cached result available
     const optimalRoute = await computeOptimalRoute(fromStationId, toStationId);
