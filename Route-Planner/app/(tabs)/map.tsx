@@ -1,7 +1,8 @@
 import { calculateBoundaryCoordinates, generateRoutePolyline } from '@/components/jsonManager';
+import { fetchOfflineMap } from '@/components/offlineMapManager';
 import { retrieveCachedRouteStations, retrieveTransferStations } from '@/components/routeFinder';
+import { MAPBOX_ACCESS_TOKEN, MAPBOX_STYLE_URL } from '@/components/secrets';
 import { fetchTubeStatusService } from '@/components/serviceStatus';
-import { ThemedView } from '@/components/themed-view';
 import { LineStatus, Station } from '@/components/types';
 import { useRoute } from '@/contexts/RouteContext';
 import Mapbox from "@rnmapbox/maps";
@@ -9,10 +10,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Mapbox configuration with API key and style URL for map display 
-const MAPBOX_STYLE_URL = "mapbox://styles/jn1324/cmdn5a594001501pjh1jc8d4m";
-const accessToken = "pk.eyJ1Ijoiam4xMzI0IiwiYSI6ImNtZ2txMGg5bzB0c3oyanNneHk2NzhiM2YifQ.Y9SOFJzcEKXBcp5vWZ4-og";
-Mapbox.setAccessToken(accessToken);
 Mapbox.setTelemetryEnabled(false);
+Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
 
 export default function MapScreen() {
     // Route context allows optimal route to be shared across pages
@@ -78,30 +77,6 @@ export default function MapScreen() {
         );
     }
 
-    // Downloads offline map for London area
-    async function downloadMap() {
-        try {
-            const offlineMap = await Mapbox.offlineManager.createPack({
-                name: "LondonDownload",
-                styleURL: MAPBOX_STYLE_URL,
-                minZoom: 10,
-                maxZoom: 20,
-                bounds: [[-0.55240631, 51.322030], [0.27980804, 51.749989]], // London bounding box
-            },
-                (offlinePack, status) => {
-                    if (status.percentage % 10 === 0) {
-                        console.log(`Map download progress: ${status.percentage}%`);
-                    }
-                },
-                (offlinePack, error) => {
-                    console.error("Error downloading map pack:", error);
-                });
-            return offlineMap;
-        } catch (error) {
-            console.error("Error downloading map:", error);
-        }
-    }
-
     // Retrieves line status for a given line name 
     // Only returns status if there is a disruption causing delay, otherwise returns null to indicate no disruption
     function fetchLineStatus(lineName: string): LineStatus | null {
@@ -113,18 +88,23 @@ export default function MapScreen() {
         return null;
     }
 
-    // Starts downloading offline map on startup
+    // Stores offline map into component on startup
     useEffect(() => {
-        async () => {
+        const storeOfflineMap = async () => {
             try {
-                const offlineMap = await downloadMap();
-                setOfflineMap(offlineMap);
-                console.log("Map downloading");
+                const offlineMapPack = await fetchOfflineMap();
+                setOfflineMap(offlineMapPack);
             } catch (error) {
-                console.error("Error downloading map:", error);
+                console.error("Error getting offline map:", error);
             }
         };
+        storeOfflineMap();
     }, []);
+
+    // Deletes offline map on startup for testing purposes
+    // useEffect(() => {
+    //     clearOfflineMap();
+    // }, []);
 
     // Rebuilds train path and popup data when new route is searched
     useEffect(() => {

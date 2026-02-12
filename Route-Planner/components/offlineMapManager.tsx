@@ -3,7 +3,7 @@ import { MAPBOX_ACCESS_TOKEN, MAPBOX_STYLE_URL } from "./secrets";
 
 const OFFLINE_MAP_KEY = "LondonDownloadv1";
 
-// Returns existing offline map if it exists, otherwise initiates download of map
+// Returns existing offline map if it exists, else initiates download of map
 export async function fetchOfflineMap() {
     Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
     const mapExists = await checkOfflineMapExists();
