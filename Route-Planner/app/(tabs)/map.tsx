@@ -10,8 +10,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Mapbox configuration with API key and style URL for map display 
-Mapbox.setTelemetryEnabled(false);
 Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
+Mapbox.setTelemetryEnabled(false);
 
 export default function MapScreen() {
     // Route context allows optimal route to be shared across pages
