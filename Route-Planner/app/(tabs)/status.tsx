@@ -6,7 +6,7 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
-export default function DisruptionScreen() {
+export default function StatusScreen() {
   // State to hold line status data and last updated time
   const [lineStatus, setLineStatus] = useState<LineStatus[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
